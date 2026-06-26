@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Orbis Courier",
+    "slug": "orbis-courier",
+    "scheme": "orbis",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.orbis.courier",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Orbis needs your location to track deliveries.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Orbis uses background location to track your delivery route.",
+        "UIBackgroundModes": ["location", "fetch"]
+      }
+    },
+    "android": {
+      "package": "com.orbis.courier",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "extra": {
+      "supabaseUrl": "${EXPO_PUBLIC_SUPABASE_URL}",
+      "supabaseAnonKey": "${EXPO_PUBLIC_SUPABASE_ANON_KEY}"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Orbis Courier needs location access to track your deliveries."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#f97316"
+        }
+      ]
+    ]
+  }
+}
