@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: 'Orbis — Kurye Takip',
   description: 'Restoran kurye ve sipariş yönetim paneli',
   icons: {
-    icon: '/favicon.png',
+    icon: '/favicon.svg',
     apple: '/logo-icon.png',
   },
 };

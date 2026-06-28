@@ -5,6 +5,11 @@ const STATUS_CONFIG: Record<
   OrderStatus,
   { label: string; className: string; dotClass: string }
 > = {
+  preparing: {
+    label: 'Hazırlanıyor',
+    className: 'bg-[#422006] text-[#fb923c] border-[#7c2d1240]',
+    dotClass: 'bg-[#fb923c] animate-pulse',
+  },
   pending: {
     label: 'Bekliyor',
     className: 'bg-[#78350f20] text-[#f59e0b] border-[#78350f40]',

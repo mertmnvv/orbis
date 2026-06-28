@@ -1,10 +1,11 @@
 import * as Location from "expo-location";
 import { create } from "zustand";
-import { Order, OrderItem, OrderStatus, DeliveryZone } from "../types";
+import { Order, OrderItem, OrderStatus, PaymentStatus, DeliveryZone } from "../types";
 import { supabase } from "../lib/supabase";
 import { point } from "@turf/helpers";
 import distance from "@turf/distance";
 import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { useAuthStore } from "./authStore";
 
 async function fetchRouteFromCurrentLocation(
   currentLng: number,
@@ -36,16 +37,21 @@ interface OrderState {
   isLoadingOrders: boolean;
   isLoadingHistory: boolean;
   _courierId: string | null;
+  _isFetching: boolean;
 
   initializeCourier: () => Promise<void>;
   fetchAvailableOrders: () => Promise<void>;
   acceptOrder: (orderId: string) => Promise<void>;
+  acceptOrders: (orderIds: string[]) => Promise<boolean>;
   rejectOrder: (orderId: string) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  recordPayment: (orderId: string, collected: boolean, notes?: string) => Promise<void>;
   fetchHistory: () => Promise<void>;
 }
 
-function mapRow(row: Record<string, any>): Order & { restaurantMaxMultiOrderKm?: number } {
+const RESTAURANTS_SELECT = "name, address, lat, lng, max_multi_order_km, max_multi_order_count, avg_prep_time_minutes";
+
+function mapRow(row: Record<string, any>): Order {
   const r = row.restaurants as Record<string, any> | null;
   return {
     id: row.id,
@@ -53,6 +59,7 @@ function mapRow(row: Record<string, any>): Order & { restaurantMaxMultiOrderKm?:
     restaurantAddress: r?.address ?? "",
     restaurantLat: Number(r?.lat) || 0,
     restaurantLng: Number(r?.lng) || 0,
+    restaurantAvgPrepTime: r?.avg_prep_time_minutes ? Number(r.avg_prep_time_minutes) : undefined,
     customerName: row.customer_name,
     customerAddress: row.customer_address,
     customerLat: Number(row.customer_lat) || 0,
@@ -64,7 +71,15 @@ function mapRow(row: Record<string, any>): Order & { restaurantMaxMultiOrderKm?:
     createdAt: row.created_at,
     estimatedDistance: "",
     estimatedTime: "",
+    preparationTimeMinutes: row.preparation_time_minutes ?? undefined,
+    estimatedReadyAt: row.estimated_ready_at ?? undefined,
+    notes: row.notes ?? undefined,
     restaurantMaxMultiOrderKm: r?.max_multi_order_km ? Number(r.max_multi_order_km) : 3.0,
+    restaurantMaxMultiOrderCount: r?.max_multi_order_count ? Number(r.max_multi_order_count) : 3,
+    paymentMethod: row.payment_method ?? "cash",
+    paymentStatus: row.payment_status ?? "pending",
+    paymentCollectedAt: row.payment_collected_at ?? null,
+    paymentNotes: row.payment_notes ?? null,
   };
 }
 
@@ -77,7 +92,7 @@ async function getCourierId(): Promise<string | null> {
     .from("couriers")
     .select("id")
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
   return data?.id ?? null;
 }
 
@@ -88,14 +103,27 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   isLoadingOrders: false,
   isLoadingHistory: false,
   _courierId: null,
+  _isFetching: false,
 
   initializeCourier: async () => {
-    const cid = await getCourierId();
+    const userId = useAuthStore.getState().user?.id;
+    let cid: string | null = null;
+    if (userId) {
+      // Use in-memory user ID to skip the auth.getUser() roundtrip.
+      const { data } = await supabase
+        .from("couriers")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      cid = data?.id ?? null;
+    } else {
+      cid = await getCourierId();
+    }
     if (cid) {
       set({ _courierId: cid });
       const { data } = await supabase
         .from("orders")
-        .select("*, restaurants(name, address, lat, lng, max_multi_order_km)")
+        .select(`*, restaurants(${RESTAURANTS_SELECT})`)
         .in("status", ["assigned", "picked_up"])
         .eq("courier_id", cid)
         .order("assigned_at", { ascending: true });
@@ -106,7 +134,14 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   },
 
   fetchAvailableOrders: async () => {
-    set({ isLoadingOrders: true });
+    if (get()._isFetching) return;
+    const { isAvailable } = useAuthStore.getState();
+    if (!isAvailable) {
+      set({ availableOrders: [], isLoadingOrders: false });
+      return;
+    }
+
+    set({ isLoadingOrders: true, _isFetching: true });
 
     // Fetch delivery zones
     const { data: zonesData } = await supabase.from("delivery_zones").select("*").eq("is_active", true);
@@ -114,13 +149,13 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
     const { data, error } = await supabase
       .from("orders")
-      .select("*, restaurants(name, address, lat, lng, max_multi_order_km)")
+      .select(`*, restaurants(${RESTAURANTS_SELECT})`)
       .eq("status", "pending")
       .order("created_at", { ascending: true });
 
     if (error) {
       console.error("[fetchAvailableOrders] error:", JSON.stringify(error));
-      set({ isLoadingOrders: false });
+      set({ isLoadingOrders: false, _isFetching: false });
       return;
     }
 
@@ -149,7 +184,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         }
         if (!inSameZone) return false;
 
-        const maxKm = (o as any).restaurantMaxMultiOrderKm ?? 3.0;
+        const maxKm = o.restaurantMaxMultiOrderKm ?? 3.0;
         let withinDistance = false;
         const newRestPt = point([o.restaurantLng, o.restaurantLat]);
         const newCustPt = point([o.customerLng, o.customerLat]);
@@ -171,7 +206,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       });
     }
 
-    set({ availableOrders: orders, isLoadingOrders: false });
+    set({ availableOrders: orders, isLoadingOrders: false, _isFetching: false });
   },
 
   acceptOrder: async (orderId) => {
@@ -202,6 +237,40 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
   },
 
+  acceptOrders: async (orderIds) => {
+    const ordersToAccept = get().availableOrders.filter((o) => orderIds.includes(o.id));
+    if (ordersToAccept.length === 0) return false;
+
+    let courierId = get()._courierId;
+    if (!courierId) {
+      courierId = await getCourierId();
+      if (!courierId) return false;
+      set({ _courierId: courierId });
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        status: "assigned",
+        courier_id: courierId,
+        assigned_at: new Date().toISOString(),
+      })
+      .in("id", orderIds);
+
+    if (error) {
+      console.error("[acceptOrders] DB error:", JSON.stringify(error));
+      return false;
+    }
+
+    const acceptedWithStatus = ordersToAccept.map(o => ({ ...o, status: "assigned" as OrderStatus }));
+    set((state) => ({
+      activeOrders: [...state.activeOrders, ...acceptedWithStatus],
+      availableOrders: state.availableOrders.filter((o) => !orderIds.includes(o.id)),
+    }));
+
+    return true;
+  },
+
   rejectOrder: (orderId) => {
     set((state) => ({
       availableOrders: state.availableOrders.filter((o) => o.id !== orderId),
@@ -213,11 +282,37 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const activeOrder = activeOrders.find(o => o.id === orderId);
     if (!activeOrder) return;
 
-    const updates: Record<string, string | number> = { status };
-    let updatedOrder = { ...activeOrder, status };
+    const updatedOrder = { ...activeOrder, status };
 
-    if (status === "picked_up") {
-      updates.picked_up_at = new Date().toISOString();
+    if (status === "delivered") {
+      // Optimistic: remove from active, add to history
+      set((state) => ({
+        activeOrders: state.activeOrders.filter(o => o.id !== orderId),
+        history: [updatedOrder, ...state.history],
+      }));
+      // Await DB write — history correctness depends on this succeeding.
+      const { error } = await supabase.from("orders").update({
+        status: "delivered",
+        delivered_at: new Date().toISOString(),
+      }).eq("id", orderId);
+      if (error) {
+        console.error("[updateOrderStatus] delivered DB error:", error.message);
+        // Revert optimistic update so user can retry
+        set((state) => ({
+          activeOrders: [{ ...activeOrder, status: "picked_up" as OrderStatus }, ...state.activeOrders],
+          history: state.history.filter(o => o.id !== orderId),
+        }));
+      }
+      return;
+    }
+
+    // "picked_up": optimistic update + background location/route (non-critical)
+    set((state) => ({
+      activeOrders: state.activeOrders.map(o => o.id === orderId ? updatedOrder : o),
+    }));
+
+    const backgroundTask = async () => {
+      const updates: Record<string, string | number> = { status, picked_up_at: new Date().toISOString() };
       try {
         const { status: permStatus } = await Location.requestForegroundPermissionsAsync();
         if (permStatus === "granted") {
@@ -225,60 +320,88 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           const { latitude, longitude } = pos.coords;
           updates.picked_up_lat = latitude;
           updates.picked_up_lng = longitude;
-
           const route = await fetchRouteFromCurrentLocation(
             longitude, latitude, activeOrder.customerLng, activeOrder.customerLat
           );
           if (route) {
-            updatedOrder = {
-              ...updatedOrder,
-              estimatedDistance: route.distance,
-              estimatedTime: route.duration,
-              pickedUpLat: latitude,
-              pickedUpLng: longitude,
-            };
+            set((state) => ({
+              activeOrders: state.activeOrders.map(o =>
+                o.id === orderId
+                  ? { ...updatedOrder, estimatedDistance: route.distance, estimatedTime: route.duration, pickedUpLat: latitude, pickedUpLng: longitude }
+                  : o
+              ),
+            }));
           }
         }
       } catch {}
-    }
-
-    if (status === "delivered") updates.delivered_at = new Date().toISOString();
-
-    const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
-
-    if (!error) {
-      if (status === "delivered") {
+      const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
+      if (error) {
+        console.error("[updateOrderStatus] picked_up DB error:", error.message);
         set((state) => ({
-          activeOrders: state.activeOrders.filter(o => o.id !== orderId),
-          history: [updatedOrder, ...state.history],
-        }));
-      } else {
-        set((state) => ({
-          activeOrders: state.activeOrders.map(o => o.id === orderId ? updatedOrder : o),
+          activeOrders: state.activeOrders.map(o =>
+            o.id === orderId ? { ...o, status: activeOrder.status } : o
+          ),
         }));
       }
+    };
+
+    backgroundTask().catch((e) => console.error("[updateOrderStatus] backgroundTask threw:", e));
+  },
+
+  recordPayment: async (orderId, collected, notes) => {
+    const status: PaymentStatus = collected ? "collected" : "failed";
+    const updates: Record<string, any> = {
+      payment_status: status,
+      payment_collected_at: collected ? new Date().toISOString() : null,
+    };
+    if (notes !== undefined) {
+      updates.payment_notes = notes;
     }
+    const { error } = await supabase
+      .from("orders")
+      .update(updates)
+      .eq("id", orderId);
+    if (error) {
+      console.error("[recordPayment] DB error:", error.message);
+      return;
+    }
+    set((state) => ({
+      activeOrders: state.activeOrders.map((o) =>
+        o.id === orderId ? { ...o, paymentStatus: status, paymentNotes: notes ?? null } : o
+      ),
+    }));
   },
 
   fetchHistory: async () => {
     set({ isLoadingHistory: true });
     let courierId = get()._courierId;
     if (!courierId) {
-      courierId = await getCourierId();
-      if (courierId) set({ _courierId: courierId });
+      // Use in-memory user ID from authStore to skip the auth.getUser() roundtrip.
+      const userId = useAuthStore.getState().user?.id;
+      if (userId) {
+        const { data } = await supabase
+          .from("couriers")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+        courierId = data?.id ?? null;
+        if (courierId) set({ _courierId: courierId });
+      }
     }
     if (!courierId) {
+      console.warn("[fetchHistory] courierId is null — courier row may not be linked to auth user");
       set({ isLoadingHistory: false });
       return;
     }
     const { data, error } = await supabase
       .from("orders")
-      .select("*, restaurants(name, address, lat, lng)")
+      .select(`*, restaurants(${RESTAURANTS_SELECT})`)
       .eq("status", "delivered")
       .eq("courier_id", courierId)
       .order("delivered_at", { ascending: false })
       .limit(50);
     if (error) {
+      console.error("[fetchHistory] DB error:", error.message);
       set({ isLoadingHistory: false });
       return;
     }

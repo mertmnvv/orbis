@@ -2,15 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ClipboardList, LogOut, Settings, Users, Map } from 'lucide-react';
+import { ClipboardList, LogOut, Settings, Users, Map, BarChart3, UtensilsCrossed } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/AuthProvider';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Siparişler', icon: ClipboardList, matchPaths: ['/dashboard', '/orders'] },
-  { href: '/couriers',  label: 'Kuryeler',   icon: Users,          matchPaths: ['/couriers'] },
-  { href: '/zones',     label: 'Bölgeler',   icon: Map,            matchPaths: ['/zones'] },
-  { href: '/settings',  label: 'Ayarlar',    icon: Settings,       matchPaths: ['/settings'] },
+  { href: '/dashboard',  label: 'Özet & Raporlar', icon: BarChart3,       matchPaths: ['/dashboard'] },
+  { href: '/orders',     label: 'Siparişler',      icon: ClipboardList,   matchPaths: ['/orders'] },
+  { href: '/couriers',   label: 'Kuryeler',        icon: Users,           matchPaths: ['/couriers'] },
+  { href: '/menu',       label: 'Menü',            icon: UtensilsCrossed, matchPaths: ['/menu'] },
+  { href: '/zones',      label: 'Bölgeler',        icon: Map,             matchPaths: ['/zones'] },
+  { href: '/settings',   label: 'Ayarlar',         icon: Settings,        matchPaths: ['/settings'] },
 ] as const;
 
 export function Sidebar() {
@@ -32,7 +34,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 p-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon, matchPaths }) => {
-          const isActive = matchPaths.some((p) => pathname.startsWith(p));
+          const isActive = matchPaths.some((p) => pathname === p || ((p as string) !== '/orders/new' && pathname.startsWith(p)));
           return (
             <Link
               key={href}

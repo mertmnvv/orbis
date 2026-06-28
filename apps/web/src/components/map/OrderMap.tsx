@@ -28,6 +28,9 @@ function OrderMapboxMap({ order }: Props) {
   const [popupOpen, setPopupOpen] = useState(false);
 
   const courierPos = order.courier_id ? couriers.get(order.courier_id) : undefined;
+  
+  const restaurantName = (order as any).restaurant?.name || 'Orbis';
+  const restaurantInitial = restaurantName.charAt(0).toUpperCase();
 
   // Haritanın başlangıç merkezi: müşteri + restoran ortası
   const centerLat = order.customer_lat ? (order.customer_lat + 41.0422) / 2 : 41.0151;
@@ -75,7 +78,7 @@ function OrderMapboxMap({ order }: Props) {
 
         {/* Restoran marker'ı */}
         <Marker longitude={29.0044} latitude={41.0422} anchor="bottom">
-          <PinIcon color="#f97316" label="R" />
+          <PinIcon color="#f97316" label={restaurantInitial} />
         </Marker>
 
         {/* Müşteri marker'ı */}

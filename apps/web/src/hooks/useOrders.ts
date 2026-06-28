@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import type { OrderStatus, OrderWithCourier } from '@/lib/types';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
+  preparing: 'Hazırlanıyor',
   pending: 'Bekliyor',
   assigned: 'Kurye Atandı',
   picked_up: 'Yolda',
@@ -20,8 +21,8 @@ async function fetchOrders(): Promise<OrderWithCourier[]> {
     .select(`
       *,
       courier:couriers (
-        id, user_id, name, phone, vehicle_type,
-        is_active, current_lat, current_lng, last_seen_at, created_at
+        id, user_id, restaurant_id, name, phone, vehicle_type,
+        is_active, is_available, current_lat, current_lng, last_seen_at, created_at
       )
     `)
     .order('created_at', { ascending: false });
@@ -56,7 +57,7 @@ export function useRealtimeOrders() {
           } else if (payload.eventType === 'UPDATE') {
             const o = payload.new as any;
             toast.info('Sipariş güncellendi', {
-              description: `${o.customer_name} → ${STATUS_LABELS[o.status as OrderStatus]}`,
+              description: `${o.customer_name} → ${STATUS_LABELS[o.status as OrderStatus] ?? o.status}`,
             });
           }
         },

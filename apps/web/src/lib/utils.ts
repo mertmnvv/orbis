@@ -24,6 +24,8 @@ export function formatCurrency(amount: number): string {
 
 export function calcETA(order: OrderWithCourier): string | null {
   switch (order.status) {
+    case 'preparing':
+      return 'Hazırlanıyor';
     case 'pending':
       return 'Kurye bekleniyor';
     case 'assigned':
@@ -41,11 +43,12 @@ export function calcETA(order: OrderWithCourier): string | null {
 }
 
 const STATUS_ORDER: Record<OrderStatus, number> = {
-  pending: 0,
-  assigned: 1,
-  picked_up: 2,
-  delivered: 3,
-  cancelled: 4,
+  preparing: 0,
+  pending: 1,
+  assigned: 2,
+  picked_up: 3,
+  delivered: 4,
+  cancelled: 5,
 };
 
 export function sortOrders(orders: OrderWithCourier[]): OrderWithCourier[] {

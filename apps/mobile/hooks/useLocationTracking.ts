@@ -18,13 +18,14 @@ import { COURIER_LOCATION_TASK } from "../tasks/locationTask";
 const BG_TIMEOUT_MS = 30 * 60 * 1000;
 
 export function useLocationTracking() {
-  const activeOrder = useOrderStore((s) => s.activeOrder);
+  const activeOrders = useOrderStore((s) => s.activeOrders);
   const user = useAuthStore((s) => s.user);
   const bgEnteredAt = useRef<number | null>(null);
+  const hasActive = activeOrders && activeOrders.length > 0;
 
   // Sipariş durumuna göre takibi başlat / durdur
   useEffect(() => {
-    if (activeOrder && user) {
+    if (hasActive && user) {
       // Arka plan görevinin kullanacağı değerleri AsyncStorage'a kaydet.
       // Production'da: user.session.access_token kullan.
       AsyncStorage.multiSet([
@@ -37,7 +38,7 @@ export function useLocationTracking() {
     }
     // Cleanup: bileşen unmount olduğunda takibi durdurma —
     // arka plan görevi uygulama kapatılana kadar çalışmaya devam etmeli.
-  }, [activeOrder?.id, user?.id]);
+  }, [hasActive, user?.id]);
 
   // AppState: arka plana geçişi ve geri dönüşü izle
   useEffect(() => {

@@ -3,13 +3,12 @@ import dynamic from 'next/dynamic';
 
 export const metadata: Metadata = { title: 'Kuryeler — Orbis' };
 
-// SSR kapalı: Google Maps ve Realtime yalnızca tarayıcıda çalışır.
-const CourierMap = dynamic(
-  () => import('@/components/map/CourierMap').then((m) => m.CourierMap),
+const CouriersPanel = dynamic(
+  () => import('@/components/couriers/CouriersPanel').then((m) => m.CouriersPanel),
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full items-center justify-center bg-gray-50">
+      <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
       </div>
     ),
@@ -24,14 +23,14 @@ export default function CouriersPage() {
         <div>
           <h1 className="text-xl font-semibold text-white">Kuryeler</h1>
           <p className="mt-0.5 text-sm text-[#a1a1aa]">
-            Aktif kuryelerin anlık konumları — Supabase Realtime
+            Restoranınıza bağlı kuryelerin durumu ve yönetimi
           </p>
         </div>
       </div>
 
-      {/* Harita — esnek yükseklik, sidebar dışındaki alanı doldurur */}
-      <div className="flex-1 overflow-hidden">
-        <CourierMap />
+      {/* Kuryeler Listesi ve Yönetim Paneli */}
+      <div className="flex-1 overflow-auto p-6">
+        <CouriersPanel />
       </div>
     </div>
   );

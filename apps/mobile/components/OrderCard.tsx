@@ -4,6 +4,7 @@ import { Order } from "../types";
 
 interface Props {
   order: Order;
+  nearbyCount?: number;
   onAccept: () => void;
   onReject: () => void;
 }
@@ -14,84 +15,199 @@ function timeAgo(iso: string): string {
   return `${diff} dk önce`;
 }
 
-export function OrderCard({ order, onAccept, onReject }: Props) {
+export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props) {
   const itemSummary =
     order.items.length === 1
       ? order.items[0].name
       : `${order.items[0].name} +${order.items.length - 1}`;
 
   return (
-    <View className="bg-dark-surface mx-4 mb-3 rounded-2xl border border-dark-border overflow-hidden">
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
-        <View className="flex-row items-center gap-x-2 flex-1">
-          <View className="w-9 h-9 rounded-xl bg-accent/15 items-center justify-center">
-            <Ionicons name="restaurant" size={18} color="#f97316" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-mtext-primary font-bold text-base" numberOfLines={1}>
-              {order.restaurantName}
-            </Text>
-            <Text className="text-mtext-muted text-xs" numberOfLines={1}>
-              {order.restaurantAddress}
-            </Text>
-          </View>
+    <View style={{
+      marginHorizontal: 16,
+      marginBottom: 12,
+      borderRadius: 18,
+      overflow: "hidden",
+      backgroundColor: "rgba(255,255,255,0.03)",
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.07)",
+    }}>
+      {/* Header row */}
+      <View style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 14,
+        paddingTop: 14,
+        paddingBottom: 10,
+        gap: 10,
+      }}>
+        <View style={{
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          backgroundColor: "rgba(249,115,22,0.1)",
+          borderWidth: 1,
+          borderColor: "rgba(249,115,22,0.2)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}>
+          <Ionicons name="restaurant" size={17} color="#f97316" />
         </View>
-        <Text className="text-mtext-muted text-xs ml-2">{timeAgo(order.createdAt)}</Text>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{ color: "#ffffff", fontWeight: "700", fontSize: 15, letterSpacing: -0.2 }}
+            numberOfLines={1}
+          >
+            {order.restaurantName}
+          </Text>
+          <Text
+            style={{ color: "#3f3f46", fontSize: 12, marginTop: 1 }}
+            numberOfLines={1}
+          >
+            {order.restaurantAddress}
+          </Text>
+        </View>
+        <Text style={{ color: "#2a2a2a", fontSize: 11, fontWeight: "600" }}>
+          {timeAgo(order.createdAt)}
+        </Text>
       </View>
 
-      {/* Divider with arrow */}
-      <View className="flex-row items-center px-4 py-1">
-        <View className="w-9 items-center">
-          <View className="w-0.5 h-4 bg-dark-border" />
-        </View>
+      {/* Route connector */}
+      <View style={{ paddingLeft: 28, paddingBottom: 2 }}>
+        <View style={{ width: 1.5, height: 14, backgroundColor: "rgba(255,255,255,0.07)", marginLeft: 5 }} />
       </View>
 
-      {/* Customer */}
-      <View className="flex-row items-center px-4 pb-3 gap-x-2">
-        <View className="w-9 h-9 rounded-xl bg-blue-500/10 items-center justify-center">
-          <Ionicons name="location" size={18} color="#3b82f6" />
+      {/* Customer row */}
+      <View style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 14,
+        paddingBottom: 12,
+        gap: 10,
+      }}>
+        <View style={{
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          backgroundColor: "rgba(59,130,246,0.08)",
+          borderWidth: 1,
+          borderColor: "rgba(59,130,246,0.15)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}>
+          <Ionicons name="location" size={17} color="#60a5fa" />
         </View>
-        <View className="flex-1">
-          <Text className="text-mtext-primary font-semibold text-sm">{order.customerName}</Text>
-          <Text className="text-mtext-muted text-xs" numberOfLines={1}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{ color: "#e4e4e7", fontWeight: "600", fontSize: 14 }}
+            numberOfLines={1}
+          >
+            {order.customerName}
+          </Text>
+          <Text
+            style={{ color: "#3f3f46", fontSize: 12, marginTop: 1 }}
+            numberOfLines={1}
+          >
             {order.customerAddress}
           </Text>
         </View>
       </View>
 
       {/* Stats row */}
-      <View className="flex-row items-center border-t border-dark-border px-4 py-2 gap-x-4">
-        <View className="flex-row items-center gap-x-1">
-          <Ionicons name="receipt-outline" size={13} color="#52525b" />
-          <Text className="text-mtext-muted text-xs">{itemSummary}</Text>
+      <View style={{
+        flexDirection: "row",
+        alignItems: "center",
+        borderTopWidth: 1,
+        borderTopColor: "rgba(255,255,255,0.05)",
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        gap: 12,
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="receipt-outline" size={12} color="#3f3f46" />
+          <Text style={{ color: "#52525b", fontSize: 12 }}>{itemSummary}</Text>
         </View>
-        <View className="flex-row items-center gap-x-1">
-          <Ionicons name="navigate-outline" size={13} color="#52525b" />
-          <Text className="text-mtext-muted text-xs">{order.estimatedDistance}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="navigate-outline" size={12} color="#3f3f46" />
+          <Text style={{ color: "#52525b", fontSize: 12 }}>{order.estimatedDistance || "—"}</Text>
         </View>
-        <View className="flex-row items-center gap-x-1">
-          <Ionicons name="time-outline" size={13} color="#52525b" />
-          <Text className="text-mtext-muted text-xs">{order.estimatedTime}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="time-outline" size={12} color="#3f3f46" />
+          <Text style={{ color: "#52525b", fontSize: 12 }}>{order.estimatedTime || "—"}</Text>
         </View>
-        <View className="flex-1" />
-        <Text className="text-mtext-primary font-bold text-base">₺{order.totalAmount}</Text>
+        <View style={{ flex: 1 }} />
+        <Text style={{ color: "#ffffff", fontWeight: "800", fontSize: 16, letterSpacing: -0.3 }}>
+          ₺{order.totalAmount}
+        </Text>
       </View>
 
+      {/* Average prep time badge */}
+      {order.restaurantAvgPrepTime != null && (
+        <View style={{
+          flexDirection: "row",
+          alignItems: "center",
+          borderTopWidth: 1,
+          borderTopColor: "rgba(255,255,255,0.05)",
+          paddingHorizontal: 14,
+          paddingVertical: 8,
+          gap: 5,
+        }}>
+          <Ionicons name="timer-outline" size={12} color="#71717a" />
+          <Text style={{ color: "#71717a", fontSize: 12 }}>
+            Ort. hazırlama: ~{order.restaurantAvgPrepTime} dk
+          </Text>
+        </View>
+      )}
+
+      {/* Multi-order opportunity badge */}
+      {nearbyCount > 0 && (
+        <View style={{
+          flexDirection: "row",
+          alignItems: "center",
+          borderTopWidth: 1,
+          borderTopColor: "rgba(249,115,22,0.12)",
+          backgroundColor: "rgba(249,115,22,0.05)",
+          paddingHorizontal: 14,
+          paddingVertical: 9,
+          gap: 7,
+        }}>
+          <Ionicons name="flash" size={12} color="#f97316" />
+          <Text style={{ color: "#f97316", fontSize: 12, fontWeight: "600", flex: 1 }}>
+            Bu siparişle birlikte {nearbyCount} sipariş daha alabilirsin!
+          </Text>
+          <Ionicons name="chevron-forward" size={12} color="rgba(249,115,22,0.5)" />
+        </View>
+      )}
+
       {/* Action buttons */}
-      <View className="flex-row border-t border-dark-border">
+      <View style={{
+        flexDirection: "row",
+        borderTopWidth: 1,
+        borderTopColor: "rgba(255,255,255,0.05)",
+      }}>
         <Pressable
           onPress={onReject}
-          className="flex-1 py-3.5 items-center active:bg-danger/10"
+          style={({ pressed }) => ({
+            flex: 1,
+            paddingVertical: 14,
+            alignItems: "center",
+            backgroundColor: pressed ? "rgba(239,68,68,0.07)" : "transparent",
+          })}
         >
-          <Text className="text-danger font-semibold text-sm">Reddet</Text>
+          <Text style={{ color: "#ef4444", fontWeight: "600", fontSize: 14 }}>Reddet</Text>
         </Pressable>
-        <View className="w-px bg-dark-border" />
+
+        <View style={{ width: 1, backgroundColor: "rgba(255,255,255,0.05)" }} />
+
         <Pressable
           onPress={onAccept}
-          className="flex-1 py-3.5 items-center active:bg-accent/10"
+          style={({ pressed }) => ({
+            flex: 1,
+            paddingVertical: 14,
+            alignItems: "center",
+            backgroundColor: pressed ? "rgba(249,115,22,0.08)" : "transparent",
+          })}
         >
-          <Text className="text-accent font-bold text-sm">Kabul Et</Text>
+          <Text style={{ color: "#f97316", fontWeight: "700", fontSize: 14 }}>İncele →</Text>
         </Pressable>
       </View>
     </View>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { RefreshCw, Clock, Bike, Package, CheckCircle2, Inbox } from 'lucide-react';
+import Link from 'next/link';
+import { RefreshCw, Clock, Bike, Package, CheckCircle2, Inbox, ChefHat, Plus } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,20 +11,24 @@ import { useOrders, useRealtimeOrders } from '@/hooks/useOrders';
 import { sortOrders } from '@/lib/utils';
 import type { OrderStatus, OrderWithCourier } from '@/lib/types';
 
-type FilterTab = 'active' | OrderStatus;
+type FilterTab = 'active' | OrderStatus | 'pending_payment';
 
 const TABS: { value: FilterTab; label: string }[] = [
-  { value: 'active',    label: 'Aktif' },
-  { value: 'pending',   label: 'Bekliyor' },
-  { value: 'assigned',  label: 'Atandı' },
-  { value: 'picked_up', label: 'Yolda' },
-  { value: 'delivered', label: 'Teslim' },
-  { value: 'cancelled', label: 'İptal' },
+  { value: 'active',          label: 'Aktif' },
+  { value: 'preparing',       label: 'Hazırlanıyor' },
+  { value: 'pending',         label: 'Bekliyor' },
+  { value: 'assigned',        label: 'Atandı' },
+  { value: 'picked_up',       label: 'Yolda' },
+  { value: 'delivered',       label: 'Teslim' },
+  { value: 'pending_payment',  label: 'Tahsilat Bekleyenler' },
+  { value: 'cancelled',       label: 'İptal' },
 ];
 
 function filterOrders(orders: OrderWithCourier[], tab: FilterTab): OrderWithCourier[] {
   if (tab === 'active')
-    return orders.filter((o) => ['pending', 'assigned', 'picked_up'].includes(o.status));
+    return orders.filter((o) => ['preparing', 'pending', 'assigned', 'picked_up'].includes(o.status));
+  if (tab === 'pending_payment')
+    return orders.filter((o) => o.status === 'delivered' && o.payment_status === 'pending');
   return orders.filter((o) => o.status === tab);
 }
 
@@ -124,11 +129,19 @@ export function OrdersBoard() {
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
             Yenile
           </Button>
+          <Link
+            href="/orders/new"
+            className="flex items-center gap-1.5 rounded-xl bg-[#f97316] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ea6c0a] transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Yeni Sipariş
+          </Link>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <StatCard label="Hazırlanıyor" count={countForTab(orders, 'preparing')} valueColor="text-[#a855f7]" icon={<ChefHat className="h-5 w-5 text-[#a855f7]" />} />
         <StatCard label="Bekliyor"      count={countForTab(orders, 'pending')}   valueColor="text-[#f59e0b]" icon={<Clock className="h-5 w-5 text-[#f59e0b]" />} />
         <StatCard label="Atandı"        count={countForTab(orders, 'assigned')}  valueColor="text-[#60a5fa]" icon={<Bike className="h-5 w-5 text-[#60a5fa]" />} />
         <StatCard label="Yolda"         count={countForTab(orders, 'picked_up')} valueColor="text-[#f97316]" icon={<Package className="h-5 w-5 text-[#f97316]" />} />

@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import distance from "@turf/distance";
+import { point } from "@turf/helpers";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import {
@@ -14,110 +16,318 @@ import { OfflineIndicator } from "../../components/OfflineIndicator";
 import { OrderCard } from "../../components/OrderCard";
 import { useAuthStore } from "../../store/authStore";
 import { useOrderStore } from "../../store/orderStore";
+import { supabase } from "../../lib/supabase";
+import { Order } from "../../types";
+
+function getNearbyCount(order: Order, allOrders: Order[]): number {
+  try {
+    const maxKm = order.restaurantMaxMultiOrderKm ?? 3.0;
+    const maxCount = order.restaurantMaxMultiOrderCount ?? 3;
+    if (!order.restaurantLng || !order.restaurantLat) return 0;
+    const restPt = point([order.restaurantLng, order.restaurantLat]);
+    const custPt = point([order.customerLng, order.customerLat]);
+
+    const nearby = allOrders.filter((o) => {
+      if (o.id === order.id || !o.restaurantLng || !o.restaurantLat) return false;
+      const oRestPt = point([o.restaurantLng, o.restaurantLat]);
+      const oCustPt = point([o.customerLng, o.customerLat]);
+      return (
+        distance(restPt, oRestPt) <= maxKm &&
+        (distance(custPt, oCustPt) <= maxKm || distance(restPt, oCustPt) <= maxKm)
+      );
+    });
+
+    return Math.min(nearby.length, maxCount - 1);
+  } catch {
+    return 0;
+  }
+}
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, isAvailable, toggleAvailability, restaurantId } = useAuthStore();
   const { availableOrders, isLoadingOrders, activeOrders, fetchAvailableOrders, acceptOrder, rejectOrder } =
     useOrderStore();
 
   useEffect(() => {
-    fetchAvailableOrders();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const init = async () => {
+      await useOrderStore.getState().initializeCourier();
+      fetchAvailableOrders();
+    };
+    init();
+
+    const channel = supabase
+      .channel("mobile-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            fetchAvailableOrders();
+            useOrderStore.getState().initializeCourier();
+          }, 300);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
+  useEffect(() => {
+    fetchAvailableOrders();
+  }, [isAvailable]);
+
   const handleAccept = (orderId: string) => {
-    acceptOrder(orderId);
-    router.navigate("/(app)/active");
+    router.navigate(`/(app)/accept/${orderId}`);
   };
 
+  const phoneDisplay = (() => {
+    if (!user?.phone) return 'Kurye';
+    const digits = user.phone.replace(/\D/g, '');
+    const local = digits.startsWith('90') ? digits.slice(2) : digits;
+    if (local.length !== 10) return user.phone;
+    return `+90 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)} ${local.slice(8, 10)}`;
+  })();
+
   return (
-    <SafeAreaView className="flex-1 bg-dark-base" edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#080808" }} edges={["top"]}>
       <OfflineIndicator />
 
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 pt-2 pb-4">
-        <View className="flex-row items-center gap-x-3">
-          <View className="w-10 h-10 rounded-full bg-accent items-center justify-center">
-            <Ionicons name="bicycle" size={20} color="white" />
+      <View style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 16,
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          {/* Avatar */}
+          <View style={{
+            width: 42,
+            height: 42,
+            borderRadius: 14,
+            backgroundColor: "rgba(249,115,22,0.12)",
+            borderWidth: 1,
+            borderColor: "rgba(249,115,22,0.25)",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <Ionicons name="person" size={18} color="#f97316" />
           </View>
           <View>
-            <Text className="text-mtext-muted text-xs font-medium">Hoş geldin</Text>
-            <Text className="text-mtext-primary text-lg font-bold">{user?.phone ?? "Kurye"}</Text>
+            <Text style={{ color: "#3f3f46", fontSize: 11, fontWeight: "600", letterSpacing: 0.5 }}>
+              HOŞ GELDİN
+            </Text>
+            <Text style={{ color: "#ffffff", fontSize: 16, fontWeight: "700", marginTop: 1 }}>
+              {phoneDisplay}
+            </Text>
           </View>
         </View>
-        <Pressable
-          onPress={signOut}
-          className="w-10 h-10 rounded-full bg-dark-surface border border-dark-border items-center justify-center active:bg-dark-elevated"
-        >
-          <Ionicons name="log-out-outline" size={20} color="#52525b" />
-        </Pressable>
+
+        {/* Action Buttons: Toggle + SignOut */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {/* Müsait Toggle */}
+          <Pressable
+            onPress={toggleAvailability}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 12,
+              backgroundColor: isAvailable
+                ? 'rgba(16,185,129,0.12)'
+                : 'rgba(255,255,255,0.04)',
+              borderWidth: 1,
+              borderColor: isAvailable
+                ? 'rgba(16,185,129,0.3)'
+                : 'rgba(255,255,255,0.07)',
+            }}
+          >
+            <View style={{
+              width: 8, height: 8, borderRadius: 4,
+              backgroundColor: isAvailable ? '#10b981' : '#3f3f46',
+            }} />
+            <Text style={{
+              color: isAvailable ? '#10b981' : '#52525b',
+              fontSize: 12,
+              fontWeight: '700',
+            }}>
+              {isAvailable ? 'Müsaitim' : 'Müsait Değil'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={signOut}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: "rgba(255,255,255,0.04)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.07)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="log-out-outline" size={19} color="#3f3f46" />
+          </Pressable>
+        </View>
       </View>
 
       {/* Active order banner */}
       {activeOrders && activeOrders.length > 0 && (
         <Pressable
           onPress={() => router.navigate("/(app)/active")}
-          className="mx-4 mb-3 bg-dark-surface border border-accent/30 rounded-2xl px-4 py-3 flex-row items-center gap-x-3 active:bg-dark-elevated"
-          style={{ borderLeftWidth: 3, borderLeftColor: "#f97316" }}
+          style={{
+            marginHorizontal: 16,
+            marginBottom: 12,
+            backgroundColor: "rgba(249,115,22,0.07)",
+            borderWidth: 1,
+            borderColor: "rgba(249,115,22,0.2)",
+            borderRadius: 16,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            borderLeftWidth: 3,
+            borderLeftColor: "#f97316",
+          }}
         >
-          <View className="w-9 h-9 rounded-full bg-accent/20 items-center justify-center">
-            <Ionicons name="bicycle" size={18} color="#f97316" />
+          <View style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            backgroundColor: "rgba(249,115,22,0.15)",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <Ionicons name="flash" size={17} color="#f97316" />
           </View>
-          <View className="flex-1">
-            <Text className="text-accent font-bold text-sm">{activeOrders.length} Aktif Sipariş Devam Ediyor</Text>
-            <Text className="text-mtext-secondary text-xs mt-0.5">
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: "#f97316", fontWeight: "700", fontSize: 13 }}>
+              {activeOrders.length} Aktif Sipariş Devam Ediyor
+            </Text>
+            <Text style={{ color: "#52525b", fontSize: 11, marginTop: 2 }}>
               Siparişleri görüntülemek için dokun
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#f97316" />
+          <Ionicons name="chevron-forward" size={15} color="rgba(249,115,22,0.6)" />
         </Pressable>
       )}
 
-      {/* Section title */}
-      <View className="flex-row items-center justify-between px-4 mb-3">
-        <Text className="text-mtext-primary font-bold text-base">Bekleyen Siparişler</Text>
-        {availableOrders.length > 0 && (
-          <View className="bg-accent/20 px-2.5 py-0.5 rounded-full border border-accent/30">
-            <Text className="text-accent font-bold text-xs">{availableOrders.length}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Order list */}
-      {isLoadingOrders ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#f97316" />
-          <Text className="text-mtext-muted mt-3 text-sm">Siparişler yükleniyor...</Text>
+      {/* Pending orders list / Offline warning / No restaurant */}
+      {!restaurantId ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <Ionicons name="storefront-outline" size={48} color="#3f3f46" />
+          <Text style={{ color: '#52525b', fontWeight: '600', fontSize: 15, marginTop: 16, textAlign: 'center' }}>
+            Henüz bir restorana bağlı değilsiniz
+          </Text>
+          <Text style={{ color: '#888888', fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+            Restoran yöneticisinden sizi sisteme eklemesini isteyin
+          </Text>
+        </View>
+      ) : !isAvailable ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <Ionicons name="pause-circle-outline" size={48} color="#3f3f46" />
+          <Text style={{ color: '#52525b', fontWeight: '600', fontSize: 15, marginTop: 16 }}>
+            Şu an müsait değilsiniz
+          </Text>
+          <Text style={{ color: '#888888', fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+            Sipariş almak için "Müsait Değil" butonuna basın
+          </Text>
         </View>
       ) : (
-        <FlatList
-          data={availableOrders}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <OrderCard
-              order={item}
-              onAccept={() => handleAccept(item.id)}
-              onReject={() => rejectOrder(item.id)}
+        <>
+          {/* Section title */}
+          <View style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 16,
+            marginBottom: 10,
+          }}>
+            <Text style={{ color: "#ffffff", fontWeight: "700", fontSize: 15, letterSpacing: -0.2 }}>
+              Bekleyen Siparişler
+            </Text>
+            {availableOrders.length > 0 && (
+              <View style={{
+                backgroundColor: "rgba(249,115,22,0.12)",
+                borderWidth: 1,
+                borderColor: "rgba(249,115,22,0.25)",
+                borderRadius: 20,
+                paddingHorizontal: 10,
+                paddingVertical: 3,
+              }}>
+                <Text style={{ color: "#f97316", fontWeight: "700", fontSize: 11 }}>
+                  {availableOrders.length}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Order list */}
+          {isLoadingOrders ? (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+              <ActivityIndicator size="large" color="#f97316" />
+              <Text style={{ color: "#3f3f46", marginTop: 12, fontSize: 13 }}>Siparişler yükleniyor...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={availableOrders}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <OrderCard
+                  order={item}
+                  nearbyCount={getNearbyCount(item, availableOrders)}
+                  onAccept={() => handleAccept(item.id)}
+                  onReject={() => rejectOrder(item.id)}
+                />
+              )}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isLoadingOrders}
+                  onRefresh={fetchAvailableOrders}
+                  tintColor="#f97316"
+                />
+              }
+              ListEmptyComponent={
+                <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80 }}>
+                  <View style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 24,
+                    backgroundColor: "rgba(255,255,255,0.03)",
+                    borderWidth: 1,
+                    borderColor: "rgba(255,255,255,0.06)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 16,
+                  }}>
+                    <Ionicons name="checkmark-circle-outline" size={38} color="#1e1e1e" />
+                  </View>
+                  <Text style={{ color: "#52525b", fontWeight: "600", fontSize: 15 }}>
+                    Bekleyen sipariş yok
+                  </Text>
+                  <Text style={{ color: "#2a2a2a", fontSize: 13, marginTop: 4 }}>
+                    Aşağı çekerek yenile
+                  </Text>
+                </View>
+              }
             />
           )}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoadingOrders}
-              onRefresh={fetchAvailableOrders}
-              tintColor="#f97316"
-            />
-          }
-          ListEmptyComponent={
-            <View className="flex-1 items-center justify-center pt-24">
-              <View className="w-20 h-20 rounded-full bg-dark-surface border border-dark-border items-center justify-center mb-4">
-                <Ionicons name="checkmark-circle-outline" size={40} color="#2a2a2a" />
-              </View>
-              <Text className="text-mtext-secondary font-semibold text-base">Bekleyen sipariş yok</Text>
-              <Text className="text-mtext-muted text-sm mt-1">Aşağı çekerek yenile</Text>
-            </View>
-          }
-        />
+        </>
       )}
     </SafeAreaView>
   );

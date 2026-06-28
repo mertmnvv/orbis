@@ -22,6 +22,8 @@ export const MOCK_ORDERS: Order[] = [
     createdAt: new Date().toISOString(),
     estimatedDistance: "1.8 km",
     estimatedTime: "12 dk",
+    paymentMethod: "cash",
+    paymentStatus: "pending",
   },
   {
     id: "order-2",
@@ -43,6 +45,8 @@ export const MOCK_ORDERS: Order[] = [
     createdAt: new Date(Date.now() - 2 * 60_000).toISOString(),
     estimatedDistance: "2.3 km",
     estimatedTime: "15 dk",
+    paymentMethod: "card",
+    paymentStatus: "pending",
   },
   {
     id: "order-3",
@@ -64,6 +68,8 @@ export const MOCK_ORDERS: Order[] = [
     createdAt: new Date(Date.now() - 5 * 60_000).toISOString(),
     estimatedDistance: "3.1 km",
     estimatedTime: "20 dk",
+    paymentMethod: "online_paid",
+    paymentStatus: "not_required",
   },
 ];
 
@@ -88,6 +94,8 @@ export const MOCK_HISTORY: Order[] = [
     createdAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
     estimatedDistance: "4.2 km",
     estimatedTime: "25 dk",
+    paymentMethod: "cash",
+    paymentStatus: "collected",
   },
   {
     id: "hist-2",
@@ -109,6 +117,8 @@ export const MOCK_HISTORY: Order[] = [
     createdAt: new Date(Date.now() - 5 * 3_600_000).toISOString(),
     estimatedDistance: "5.0 km",
     estimatedTime: "30 dk",
+    paymentMethod: "card",
+    paymentStatus: "collected",
   },
   {
     id: "hist-3",
@@ -130,5 +140,7 @@ export const MOCK_HISTORY: Order[] = [
     createdAt: new Date(Date.now() - 24 * 3_600_000).toISOString(),
     estimatedDistance: "1.4 km",
     estimatedTime: "10 dk",
+    paymentMethod: "online_paid",
+    paymentStatus: "not_required",
   },
 ];

@@ -1,9 +1,13 @@
 export type OrderStatus =
+  | "preparing"
   | "pending"
   | "assigned"
   | "picked_up"
   | "delivered"
   | "cancelled";
+
+export type PaymentMethod = "cash" | "card" | "online_paid";
+export type PaymentStatus = "not_required" | "pending" | "collected" | "failed";
 
 export interface OrderItem {
   name: string;
@@ -17,6 +21,7 @@ export interface Order {
   restaurantAddress: string;
   restaurantLat: number;
   restaurantLng: number;
+  restaurantAvgPrepTime?: number;
   customerName: string;
   customerAddress: string;
   customerLat: number;
@@ -28,8 +33,17 @@ export interface Order {
   createdAt: string;
   estimatedDistance: string;
   estimatedTime: string;
+  preparationTimeMinutes?: number;
+  estimatedReadyAt?: string;
+  notes?: string;
   pickedUpLat?: number;
   pickedUpLng?: number;
+  restaurantMaxMultiOrderKm?: number;
+  restaurantMaxMultiOrderCount?: number;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paymentCollectedAt?: string | null;
+  paymentNotes?: string | null;
 }
 
 export interface CourierLocation {

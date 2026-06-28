@@ -1,4 +1,4 @@
-import type { Courier, OrderWithCourier, Restaurant } from './types';
+import type { Courier, MenuItem, OrderWithCourier, Restaurant } from './types';
 
 const t = (minsAgo: number) =>
   new Date(Date.now() - minsAgo * 60_000).toISOString();
@@ -11,6 +11,7 @@ export const mockRestaurant: Restaurant = {
   lat: 41.0422,
   lng: 29.0044,
   phone: '+90 212 555 0100',
+  avg_prep_time_minutes: 20,
   created_at: new Date('2024-01-01').toISOString(),
 };
 
@@ -18,10 +19,12 @@ export const mockCouriers: Courier[] = [
   {
     id: 'courier-001',
     user_id: 'user-002',
+    restaurant_id: 'rest-001',
     name: 'Mehmet Kaya',
     phone: '+90 532 111 2233',
     vehicle_type: 'motorcycle',
     is_active: true,
+    is_available: true,
     current_lat: 41.045,
     current_lng: 29.006,
     last_seen_at: t(2),
@@ -30,10 +33,12 @@ export const mockCouriers: Courier[] = [
   {
     id: 'courier-002',
     user_id: 'user-003',
+    restaurant_id: 'rest-001',
     name: 'Ali Demir',
     phone: '+90 533 444 5566',
     vehicle_type: 'motorcycle',
     is_active: true,
+    is_available: true,
     current_lat: 41.038,
     current_lng: 29.012,
     last_seen_at: t(5),
@@ -42,15 +47,40 @@ export const mockCouriers: Courier[] = [
   {
     id: 'courier-003',
     user_id: 'user-004',
+    restaurant_id: null,
     name: 'Hasan Yıldız',
     phone: '+90 534 777 8899',
     vehicle_type: 'bicycle',
     is_active: false,
+    is_available: false,
     current_lat: null,
     current_lng: null,
     last_seen_at: t(120),
     created_at: new Date('2024-02-15').toISOString(),
   },
+];
+
+export const MOCK_MENU_ITEMS: MenuItem[] = [
+  // Ana Yemekler
+  { id: 'menu-01', restaurant_id: 'rest-001', category: 'Ana Yemekler', name: 'Adana Kebap', description: '300g el yapımı köy biberi kebabı, lavash, közlenmiş domates', price: 185, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-02', restaurant_id: 'rest-001', category: 'Ana Yemekler', name: 'Tavuk Şiş', description: 'Marine edilmiş ızgara tavuk, pilav ve salata', price: 145, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-03', restaurant_id: 'rest-001', category: 'Ana Yemekler', name: 'Köfte Tabağı', description: 'Izgara köfte, patates kızartması, közlenmiş biber', price: 130, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-04', restaurant_id: 'rest-001', category: 'Ana Yemekler', name: 'Lahmacun (3 Adet)', description: 'İnce hamur, kıymalı harç, yanında limon ve maydanoz', price: 90, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-05', restaurant_id: 'rest-001', category: 'Ana Yemekler', name: 'İskender Kebap', description: 'Döner üzeri yoğurt, domates sosu ve tereyağı', price: 210, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  // Başlangıçlar
+  { id: 'menu-06', restaurant_id: 'rest-001', category: 'Başlangıçlar', name: 'Mercimek Çorbası', description: 'Geleneksel kırmızı mercimek çorbası, limon ve nane', price: 55, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-07', restaurant_id: 'rest-001', category: 'Başlangıçlar', name: 'Humus', description: 'Tahin, limon ve zeytinyağı ile hazırlanan nohut ezmesi', price: 65, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-08', restaurant_id: 'rest-001', category: 'Başlangıçlar', name: 'Sigara Böreği (6 Adet)', description: 'Peynirli ince yufka böreği, çıtır kızartma', price: 75, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-09', restaurant_id: 'rest-001', category: 'Başlangıçlar', name: 'Patlıcan Ezmesi', description: 'Közlenmiş patlıcan, sarımsak, zeytinyağı', price: 60, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  // İçecekler
+  { id: 'menu-10', restaurant_id: 'rest-001', category: 'İçecekler', name: 'Ayran', description: 'Taze çırpılmış ayran, 250ml', price: 20, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-11', restaurant_id: 'rest-001', category: 'İçecekler', name: 'Kola', description: 'Soğuk içecek, 330ml', price: 25, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-12', restaurant_id: 'rest-001', category: 'İçecekler', name: 'Su', description: 'Pet şişe su, 500ml', price: 10, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-13', restaurant_id: 'rest-001', category: 'İçecekler', name: 'Şalgam', description: 'Acılı veya acısız şalgam suyu, 250ml', price: 20, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  // Tatlılar
+  { id: 'menu-14', restaurant_id: 'rest-001', category: 'Tatlılar', name: 'Baklava (3 Dilim)', description: 'Antep fıstıklı baklava, özel şerbet', price: 95, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-15', restaurant_id: 'rest-001', category: 'Tatlılar', name: 'Sütlaç', description: 'Fırın sütlaç, tarçın ile servis edilir', price: 65, is_available: true, created_at: new Date('2024-01-01').toISOString() },
+  { id: 'menu-16', restaurant_id: 'rest-001', category: 'Tatlılar', name: 'Kadayıf', description: 'Sade kadayıf, dondurmalı veya sade', price: 80, is_available: true, created_at: new Date('2024-01-01').toISOString() },
 ];
 
 export const mockOrders: OrderWithCourier[] = [
@@ -66,6 +96,8 @@ export const mockOrders: OrderWithCourier[] = [
     customer_lng: 29.035,
     status: 'picked_up',
     total_amount: 284.9,
+    payment_method: 'online_paid',
+    payment_status: 'not_required',
     created_at: t(22),
     assigned_at: t(18),
     picked_up_at: t(8),
@@ -84,6 +116,8 @@ export const mockOrders: OrderWithCourier[] = [
     customer_lng: 29.0678,
     status: 'assigned',
     total_amount: 156.5,
+    payment_method: 'cash',
+    payment_status: 'pending',
     created_at: t(12),
     assigned_at: t(8),
     picked_up_at: null,
@@ -102,6 +136,8 @@ export const mockOrders: OrderWithCourier[] = [
     customer_lng: 28.987,
     status: 'pending',
     total_amount: 89.9,
+    payment_method: 'online_paid',
+    payment_status: 'not_required',
     created_at: t(5),
     assigned_at: null,
     picked_up_at: null,
@@ -120,6 +156,8 @@ export const mockOrders: OrderWithCourier[] = [
     customer_lng: 29.0012,
     status: 'delivered',
     total_amount: 445.0,
+    payment_method: 'online_paid',
+    payment_status: 'not_required',
     created_at: t(90),
     assigned_at: t(85),
     picked_up_at: t(72),
@@ -138,6 +176,8 @@ export const mockOrders: OrderWithCourier[] = [
     customer_lng: 28.9944,
     status: 'pending',
     total_amount: 210.0,
+    payment_method: 'card',
+    payment_status: 'pending',
     created_at: t(3),
     assigned_at: null,
     picked_up_at: null,
@@ -156,6 +196,8 @@ export const mockOrders: OrderWithCourier[] = [
     customer_lng: 29.008,
     status: 'picked_up',
     total_amount: 127.5,
+    payment_method: 'online_paid',
+    payment_status: 'not_required',
     created_at: t(35),
     assigned_at: t(30),
     picked_up_at: t(15),
@@ -174,6 +216,8 @@ export const mockOrders: OrderWithCourier[] = [
     customer_lng: 29.005,
     status: 'pending',
     total_amount: 340.0,
+    payment_method: 'cash',
+    payment_status: 'pending',
     created_at: t(8),
     assigned_at: null,
     picked_up_at: null,
@@ -192,6 +236,9 @@ export const mockOrders: OrderWithCourier[] = [
     customer_lng: 29.0108,
     status: 'delivered',
     total_amount: 195.0,
+    payment_method: 'cash',
+    payment_status: 'collected',
+    payment_collected_at: t(62),
     created_at: t(120),
     assigned_at: t(115),
     picked_up_at: t(100),
