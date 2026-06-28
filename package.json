@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "patch-package",
     "web": "npm run dev --workspace=@orbis/web",
     "mobile": "npm run start --workspace=@orbis/mobile",
     "build": "npm run build --workspaces --if-present",
@@ -18,7 +19,8 @@
     "node": ">=18.18.0"
   },
   "devDependencies": {
-    "@babel/core": "^8.0.1"
+    "@babel/core": "^8.0.1",
+    "patch-package": "^8.0.0"
   },
   "overrides": {
     "@types/react": "^18.3.0",

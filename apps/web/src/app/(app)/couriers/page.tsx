@@ -20,10 +20,10 @@ export default function CouriersPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Başlık */}
-      <div className="flex items-center justify-between border-b bg-white px-6 py-4">
+      <div className="flex items-center justify-between border-b border-[#2a2a2a] bg-[#121212] px-6 py-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Kuryeler</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
+          <h1 className="text-xl font-semibold text-white">Kuryeler</h1>
+          <p className="mt-0.5 text-sm text-[#a1a1aa]">
             Aktif kuryelerin anlık konumları — Supabase Realtime
           </p>
         </div>

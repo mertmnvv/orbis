@@ -25,35 +25,35 @@ function formatDate(iso: string): string {
 
 function HistoryCard({ order }: { order: Order }) {
   return (
-    <View className="bg-white mx-4 mb-3 rounded-2xl p-4 shadow-sm border border-gray-100">
+    <View className="bg-dark-surface mx-4 mb-3 rounded-2xl p-4 border border-dark-border">
       <View className="flex-row items-start justify-between mb-2">
         <View className="flex-1">
-          <Text className="text-gray-900 font-bold text-base">{order.restaurantName}</Text>
-          <Text className="text-gray-500 text-xs mt-0.5">{formatDate(order.createdAt)}</Text>
+          <Text className="text-mtext-primary font-bold text-base">{order.restaurantName}</Text>
+          <Text className="text-mtext-muted text-xs mt-0.5">{formatDate(order.createdAt)}</Text>
         </View>
-        <View className="bg-green-100 px-2.5 py-1 rounded-full">
-          <Text className="text-green-700 text-xs font-bold">Teslim Edildi</Text>
+        <View className="bg-success/15 px-2.5 py-1 rounded-full border border-success/20">
+          <Text className="text-success text-xs font-bold">Teslim Edildi</Text>
         </View>
       </View>
 
       <View className="flex-row items-center gap-x-1 mb-2">
-        <Ionicons name="location-outline" size={13} color="#9ca3af" />
-        <Text className="text-gray-500 text-xs flex-1" numberOfLines={1}>
+        <Ionicons name="location-outline" size={13} color="#52525b" />
+        <Text className="text-mtext-muted text-xs flex-1" numberOfLines={1}>
           {order.customerName} · {order.customerAddress}
         </Text>
       </View>
 
-      <View className="flex-row items-center border-t border-gray-50 pt-2 gap-x-4">
+      <View className="flex-row items-center border-t border-dark-border pt-2 gap-x-4">
         <View className="flex-row items-center gap-x-1">
-          <Ionicons name="navigate-outline" size={12} color="#9ca3af" />
-          <Text className="text-gray-400 text-xs">{order.estimatedDistance}</Text>
+          <Ionicons name="navigate-outline" size={12} color="#52525b" />
+          <Text className="text-mtext-muted text-xs">{order.estimatedDistance}</Text>
         </View>
         <View className="flex-row items-center gap-x-1">
-          <Ionicons name="receipt-outline" size={12} color="#9ca3af" />
-          <Text className="text-gray-400 text-xs">{order.items.length} kalem</Text>
+          <Ionicons name="receipt-outline" size={12} color="#52525b" />
+          <Text className="text-mtext-muted text-xs">{order.items.length} kalem</Text>
         </View>
         <View className="flex-1" />
-        <Text className="text-gray-900 font-bold">₺{order.totalAmount}</Text>
+        <Text className="text-mtext-primary font-bold">₺{order.totalAmount}</Text>
       </View>
     </View>
   );
@@ -62,24 +62,25 @@ function HistoryCard({ order }: { order: Order }) {
 function SummaryBar({ orders }: { orders: Order[] }) {
   const totalEarnings = orders.reduce((sum, o) => sum + o.totalAmount * 0.1, 0);
   const totalDistance = orders.reduce((sum, o) => {
-    return sum + parseFloat(o.estimatedDistance.replace(" km", ""));
+    return sum + parseFloat(o.estimatedDistance.replace(" km", "") || "0");
   }, 0);
 
   return (
-    <View className="mx-4 mb-4 bg-orange-500 rounded-2xl p-4 flex-row">
+    <View className="mx-4 mb-4 bg-dark-surface rounded-2xl p-4 flex-row border border-dark-border"
+      style={{ borderLeftWidth: 3, borderLeftColor: "#f97316" }}>
       <View className="flex-1 items-center">
-        <Text className="text-white font-bold text-xl">{orders.length}</Text>
-        <Text className="text-orange-100 text-xs mt-0.5">Teslimat</Text>
+        <Text className="text-accent font-bold text-xl">{orders.length}</Text>
+        <Text className="text-mtext-muted text-xs mt-0.5">Teslimat</Text>
       </View>
-      <View className="w-px bg-orange-400 mx-2" />
+      <View className="w-px bg-dark-border mx-2" />
       <View className="flex-1 items-center">
-        <Text className="text-white font-bold text-xl">{totalDistance.toFixed(1)} km</Text>
-        <Text className="text-orange-100 text-xs mt-0.5">Toplam Mesafe</Text>
+        <Text className="text-mtext-primary font-bold text-xl">{totalDistance.toFixed(1)} km</Text>
+        <Text className="text-mtext-muted text-xs mt-0.5">Toplam Mesafe</Text>
       </View>
-      <View className="w-px bg-orange-400 mx-2" />
+      <View className="w-px bg-dark-border mx-2" />
       <View className="flex-1 items-center">
-        <Text className="text-white font-bold text-xl">₺{totalEarnings.toFixed(0)}</Text>
-        <Text className="text-orange-100 text-xs mt-0.5">Kazanç</Text>
+        <Text className="text-success font-bold text-xl">₺{totalEarnings.toFixed(0)}</Text>
+        <Text className="text-mtext-muted text-xs mt-0.5">Kazanç</Text>
       </View>
     </View>
   );
@@ -93,12 +94,12 @@ export default function HistoryScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-dark-base" edges={["top"]}>
       <OfflineIndicator />
 
       {/* Header */}
       <View className="px-4 pt-2 pb-4">
-        <Text className="text-gray-900 text-xl font-bold">Geçmiş Teslimatlar</Text>
+        <Text className="text-mtext-primary text-xl font-bold">Geçmiş Teslimatlar</Text>
       </View>
 
       {isLoadingHistory ? (
@@ -121,11 +122,11 @@ export default function HistoryScreen() {
           }
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center pt-24">
-              <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-4">
-                <Ionicons name="time-outline" size={40} color="#d1d5db" />
+              <View className="w-20 h-20 rounded-full bg-dark-surface border border-dark-border items-center justify-center mb-4">
+                <Ionicons name="time-outline" size={40} color="#2a2a2a" />
               </View>
-              <Text className="text-gray-500 font-semibold text-base">Henüz teslimat yok</Text>
-              <Text className="text-gray-400 text-sm mt-1">Tamamlanan siparişler burada görünür</Text>
+              <Text className="text-mtext-secondary font-semibold text-base">Henüz teslimat yok</Text>
+              <Text className="text-mtext-muted text-sm mt-1">Tamamlanan siparişler burada görünür</Text>
             </View>
           }
         />

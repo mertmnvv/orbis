@@ -1,9 +1,9 @@
 export type OrderStatus =
   | "pending"
-  | "accepted"
+  | "assigned"
   | "picked_up"
   | "delivered"
-  | "rejected";
+  | "cancelled";
 
 export interface OrderItem {
   name: string;
@@ -28,10 +28,20 @@ export interface Order {
   createdAt: string;
   estimatedDistance: string;
   estimatedTime: string;
+  pickedUpLat?: number;
+  pickedUpLng?: number;
 }
 
 export interface CourierLocation {
   latitude: number;
   longitude: number;
   timestamp: number;
+}
+
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  polygon: any;
+  color: string;
+  is_active: boolean;
 }

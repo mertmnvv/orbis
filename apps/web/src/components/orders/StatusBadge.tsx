@@ -7,28 +7,28 @@ const STATUS_CONFIG: Record<
 > = {
   pending: {
     label: 'Bekliyor',
-    className: 'bg-amber-50 text-amber-800 border-amber-200',
-    dotClass: 'bg-amber-400',
+    className: 'bg-[#78350f20] text-[#f59e0b] border-[#78350f40]',
+    dotClass: 'bg-[#f59e0b]',
   },
   assigned: {
     label: 'Atandı',
-    className: 'bg-blue-50 text-blue-800 border-blue-200',
-    dotClass: 'bg-blue-500',
+    className: 'bg-[#1e3a5f] text-[#60a5fa] border-[#1e40af40]',
+    dotClass: 'bg-[#3b82f6]',
   },
   picked_up: {
     label: 'Yolda',
-    className: 'bg-orange-50 text-orange-800 border-orange-200',
-    dotClass: 'bg-orange-500 animate-pulse',
+    className: 'bg-[#431407] text-[#f97316] border-[#7c2d1240]',
+    dotClass: 'bg-[#f97316] animate-pulse',
   },
   delivered: {
     label: 'Teslim',
-    className: 'bg-green-50 text-green-800 border-green-200',
-    dotClass: 'bg-green-500',
+    className: 'bg-[#14532d20] text-[#22c55e] border-[#14532d40]',
+    dotClass: 'bg-[#22c55e]',
   },
   cancelled: {
     label: 'İptal',
-    className: 'bg-gray-50 text-gray-500 border-gray-200',
-    dotClass: 'bg-gray-400',
+    className: 'bg-[#1c1c1c] text-[#71717a] border-[#2a2a2a]',
+    dotClass: 'bg-[#71717a]',
   },
 };
 

@@ -1,70 +1,287 @@
+import * as Location from "expo-location";
 import { create } from "zustand";
-import { Order, OrderStatus } from "../types";
-import { MOCK_HISTORY, MOCK_ORDERS } from "../mocks/data";
+import { Order, OrderItem, OrderStatus, DeliveryZone } from "../types";
+import { supabase } from "../lib/supabase";
+import { point } from "@turf/helpers";
+import distance from "@turf/distance";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+
+async function fetchRouteFromCurrentLocation(
+  currentLng: number,
+  currentLat: number,
+  destLng: number,
+  destLat: number
+): Promise<{ distance: string; duration: string } | null> {
+  const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  if (!token) return null;
+  try {
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${currentLng},${currentLat};${destLng},${destLat}?access_token=${token}&overview=false`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const route = json.routes?.[0];
+    if (!route) return null;
+    const km = (route.distance / 1000).toFixed(1);
+    const min = Math.ceil(route.duration / 60);
+    return { distance: `${km} km`, duration: `${min} dk` };
+  } catch {
+    return null;
+  }
+}
 
 interface OrderState {
   availableOrders: Order[];
-  activeOrder: Order | null;
+  activeOrders: Order[];
   history: Order[];
   isLoadingOrders: boolean;
   isLoadingHistory: boolean;
+  _courierId: string | null;
 
+  initializeCourier: () => Promise<void>;
   fetchAvailableOrders: () => Promise<void>;
-  acceptOrder: (orderId: string) => void;
+  acceptOrder: (orderId: string) => Promise<void>;
   rejectOrder: (orderId: string) => void;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   fetchHistory: () => Promise<void>;
+}
+
+function mapRow(row: Record<string, any>): Order & { restaurantMaxMultiOrderKm?: number } {
+  const r = row.restaurants as Record<string, any> | null;
+  return {
+    id: row.id,
+    restaurantName: r?.name ?? "",
+    restaurantAddress: r?.address ?? "",
+    restaurantLat: Number(r?.lat) || 0,
+    restaurantLng: Number(r?.lng) || 0,
+    customerName: row.customer_name,
+    customerAddress: row.customer_address,
+    customerLat: Number(row.customer_lat) || 0,
+    customerLng: Number(row.customer_lng) || 0,
+    customerPhone: row.customer_phone ?? "",
+    items: (row.items as OrderItem[]) ?? [],
+    totalAmount: Number(row.total_amount),
+    status: row.status as OrderStatus,
+    createdAt: row.created_at,
+    estimatedDistance: "",
+    estimatedTime: "",
+    restaurantMaxMultiOrderKm: r?.max_multi_order_km ? Number(r.max_multi_order_km) : 3.0,
+  };
+}
+
+async function getCourierId(): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("couriers")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+  return data?.id ?? null;
 }
 
 export const useOrderStore = create<OrderState>((set, get) => ({
   availableOrders: [],
-  activeOrder: null,
+  activeOrders: [],
   history: [],
   isLoadingOrders: false,
   isLoadingHistory: false,
+  _courierId: null,
+
+  initializeCourier: async () => {
+    const cid = await getCourierId();
+    if (cid) {
+      set({ _courierId: cid });
+      const { data } = await supabase
+        .from("orders")
+        .select("*, restaurants(name, address, lat, lng, max_multi_order_km)")
+        .in("status", ["assigned", "picked_up"])
+        .eq("courier_id", cid)
+        .order("assigned_at", { ascending: true });
+      if (data) {
+        set({ activeOrders: data.map(mapRow) });
+      }
+    }
+  },
 
   fetchAvailableOrders: async () => {
     set({ isLoadingOrders: true });
-    // Production: const { data } = await supabase.from('orders').select('*').eq('status', 'pending');
-    await new Promise((r) => setTimeout(r, 600));
-    set({ availableOrders: MOCK_ORDERS, isLoadingOrders: false });
+
+    // Fetch delivery zones
+    const { data: zonesData } = await supabase.from("delivery_zones").select("*").eq("is_active", true);
+    const zones = (zonesData || []) as DeliveryZone[];
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*, restaurants(name, address, lat, lng, max_multi_order_km)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("[fetchAvailableOrders] error:", JSON.stringify(error));
+      set({ isLoadingOrders: false });
+      return;
+    }
+
+    let orders = (data ?? []).map(mapRow);
+    const { activeOrders } = get();
+
+    if (activeOrders.length > 0) {
+      const activeZones = new Set<string>();
+      for (const ao of activeOrders) {
+        const pt = point([ao.customerLng, ao.customerLat]);
+        for (const z of zones) {
+          if (booleanPointInPolygon(pt, z.polygon)) {
+            activeZones.add(z.id);
+          }
+        }
+      }
+
+      orders = orders.filter((o) => {
+        let inSameZone = activeZones.size === 0;
+        const pt = point([o.customerLng, o.customerLat]);
+        for (const z of zones) {
+          if (activeZones.has(z.id) && booleanPointInPolygon(pt, z.polygon)) {
+            inSameZone = true;
+            break;
+          }
+        }
+        if (!inSameZone) return false;
+
+        const maxKm = (o as any).restaurantMaxMultiOrderKm ?? 3.0;
+        let withinDistance = false;
+        const newRestPt = point([o.restaurantLng, o.restaurantLat]);
+        const newCustPt = point([o.customerLng, o.customerLat]);
+
+        for (const ao of activeOrders) {
+          const aoRestPt = point([ao.restaurantLng, ao.restaurantLat]);
+          const aoCustPt = point([ao.customerLng, ao.customerLat]);
+          if (
+            distance(newRestPt, aoRestPt) <= maxKm ||
+            distance(newRestPt, aoCustPt) <= maxKm ||
+            distance(newCustPt, aoRestPt) <= maxKm ||
+            distance(newCustPt, aoCustPt) <= maxKm
+          ) {
+            withinDistance = true;
+            break;
+          }
+        }
+        return withinDistance;
+      });
+    }
+
+    set({ availableOrders: orders, isLoadingOrders: false });
   },
 
-  acceptOrder: (orderId) => {
+  acceptOrder: async (orderId) => {
     const order = get().availableOrders.find((o) => o.id === orderId);
     if (!order) return;
-    // Production: await supabase.from('orders').update({ status: 'accepted', courier_id: user.id }).eq('id', orderId);
-    set((state) => ({
-      activeOrder: { ...order, status: "accepted" },
-      availableOrders: state.availableOrders.filter((o) => o.id !== orderId),
-    }));
+
+    let courierId = get()._courierId;
+    if (!courierId) {
+      courierId = await getCourierId();
+      if (!courierId) return;
+      set({ _courierId: courierId });
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        status: "assigned",
+        courier_id: courierId,
+        assigned_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (!error) {
+      set((state) => ({
+        activeOrders: [...state.activeOrders, { ...order, status: "assigned" }],
+        availableOrders: state.availableOrders.filter((o) => o.id !== orderId),
+      }));
+    }
   },
 
   rejectOrder: (orderId) => {
-    // Production: log rejection or re-assign via backend
     set((state) => ({
       availableOrders: state.availableOrders.filter((o) => o.id !== orderId),
     }));
   },
 
-  updateOrderStatus: (orderId, status) => {
-    const { activeOrder } = get();
-    if (!activeOrder || activeOrder.id !== orderId) return;
-    // Production: await supabase.from('orders').update({ status }).eq('id', orderId);
-    if (status === "delivered") {
-      set((state) => ({
-        activeOrder: null,
-        history: [{ ...activeOrder, status }, ...state.history],
-      }));
-    } else {
-      set({ activeOrder: { ...activeOrder, status } });
+  updateOrderStatus: async (orderId, status) => {
+    const { activeOrders } = get();
+    const activeOrder = activeOrders.find(o => o.id === orderId);
+    if (!activeOrder) return;
+
+    const updates: Record<string, string | number> = { status };
+    let updatedOrder = { ...activeOrder, status };
+
+    if (status === "picked_up") {
+      updates.picked_up_at = new Date().toISOString();
+      try {
+        const { status: permStatus } = await Location.requestForegroundPermissionsAsync();
+        if (permStatus === "granted") {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+          const { latitude, longitude } = pos.coords;
+          updates.picked_up_lat = latitude;
+          updates.picked_up_lng = longitude;
+
+          const route = await fetchRouteFromCurrentLocation(
+            longitude, latitude, activeOrder.customerLng, activeOrder.customerLat
+          );
+          if (route) {
+            updatedOrder = {
+              ...updatedOrder,
+              estimatedDistance: route.distance,
+              estimatedTime: route.duration,
+              pickedUpLat: latitude,
+              pickedUpLng: longitude,
+            };
+          }
+        }
+      } catch {}
+    }
+
+    if (status === "delivered") updates.delivered_at = new Date().toISOString();
+
+    const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
+
+    if (!error) {
+      if (status === "delivered") {
+        set((state) => ({
+          activeOrders: state.activeOrders.filter(o => o.id !== orderId),
+          history: [updatedOrder, ...state.history],
+        }));
+      } else {
+        set((state) => ({
+          activeOrders: state.activeOrders.map(o => o.id === orderId ? updatedOrder : o),
+        }));
+      }
     }
   },
 
   fetchHistory: async () => {
     set({ isLoadingHistory: true });
-    // Production: const { data } = await supabase.from('orders').select('*').eq('status', 'delivered').order('created_at', { ascending: false });
-    await new Promise((r) => setTimeout(r, 400));
-    set({ history: MOCK_HISTORY, isLoadingHistory: false });
+    let courierId = get()._courierId;
+    if (!courierId) {
+      courierId = await getCourierId();
+      if (courierId) set({ _courierId: courierId });
+    }
+    if (!courierId) {
+      set({ isLoadingHistory: false });
+      return;
+    }
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*, restaurants(name, address, lat, lng)")
+      .eq("status", "delivered")
+      .eq("courier_id", courierId)
+      .order("delivered_at", { ascending: false })
+      .limit(50);
+    if (error) {
+      set({ isLoadingHistory: false });
+      return;
+    }
+    set({ history: (data ?? []).map(mapRow), isLoadingHistory: false });
   },
 }));

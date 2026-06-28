@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { OfflineIndicator } from "../../components/OfflineIndicator";
 import { useOrderStore } from "../../store/orderStore";
@@ -9,28 +10,30 @@ import { Order, OrderStatus } from "../../types";
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: "Bekliyor",
-  accepted: "Kabul Edildi",
+  assigned: "Kabul Edildi",
   picked_up: "Teslim Alındı",
   delivered: "Teslim Edildi",
-  rejected: "Reddedildi",
+  cancelled: "İptal Edildi",
 };
 
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  pending: "bg-yellow-100 text-yellow-700",
-  accepted: "bg-blue-100 text-blue-700",
-  picked_up: "bg-orange-100 text-orange-700",
-  delivered: "bg-green-100 text-green-700",
-  rejected: "bg-red-100 text-red-700",
+const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string }> = {
+  pending:   { bg: "#78350f20", text: "#f59e0b" },
+  assigned:  { bg: "#1e3a5f", text: "#60a5fa" },
+  picked_up: { bg: "#431407", text: "#f97316" },
+  delivered: { bg: "#14532d", text: "#22c55e" },
+  cancelled: { bg: "#1c1c1c", text: "#71717a" },
 };
 
 function RouteStep({
   icon,
+  iconColor,
   iconBg,
   title,
   address,
   isLast,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
   iconBg: string;
   title: string;
   address: string;
@@ -39,14 +42,14 @@ function RouteStep({
   return (
     <View className="flex-row gap-x-3">
       <View className="items-center">
-        <View className={`w-10 h-10 rounded-xl items-center justify-center ${iconBg}`}>
-          <Ionicons name={icon} size={18} color={iconBg.includes("orange") ? "#f97316" : "#3b82f6"} />
+        <View className="w-10 h-10 rounded-xl items-center justify-center" style={{ backgroundColor: iconBg }}>
+          <Ionicons name={icon} size={18} color={iconColor} />
         </View>
-        {!isLast && <View className="w-0.5 flex-1 bg-gray-200 my-1" />}
+        {!isLast && <View className="w-0.5 flex-1 bg-dark-border my-1" />}
       </View>
       <View className="flex-1 pb-4">
-        <Text className="text-gray-500 text-xs font-medium mb-0.5">{title}</Text>
-        <Text className="text-gray-900 font-semibold text-sm">{address}</Text>
+        <Text className="text-mtext-muted text-xs font-medium mb-0.5">{title}</Text>
+        <Text className="text-mtext-primary font-semibold text-sm">{address}</Text>
       </View>
     </View>
   );
@@ -54,15 +57,28 @@ function RouteStep({
 
 function NextActionButton({ order }: { order: Order }) {
   const { updateOrderStatus } = useOrderStore();
+  const [loading, setLoading] = useState(false);
 
-  if (order.status === "accepted") {
+  if (order.status === "assigned") {
     return (
       <Pressable
-        onPress={() => updateOrderStatus(order.id, "picked_up")}
-        className="bg-orange-500 rounded-2xl py-4 items-center active:bg-orange-600 flex-row justify-center gap-x-2"
+        onPress={async () => {
+          setLoading(true);
+          await updateOrderStatus(order.id, "picked_up");
+          setLoading(false);
+        }}
+        disabled={loading}
+        className="bg-accent rounded-2xl py-4 items-center active:opacity-80 flex-row justify-center gap-x-2 mt-4"
+        style={{ shadowColor: "#f97316", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
       >
-        <Ionicons name="bag-check-outline" size={20} color="white" />
-        <Text className="text-white font-bold text-base">Yemeği Teslim Aldım</Text>
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <>
+            <Ionicons name="bag-check-outline" size={20} color="white" />
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>Yemeği Teslim Aldım</Text>
+          </>
+        )}
       </Pressable>
     );
   }
@@ -70,11 +86,23 @@ function NextActionButton({ order }: { order: Order }) {
   if (order.status === "picked_up") {
     return (
       <Pressable
-        onPress={() => updateOrderStatus(order.id, "delivered")}
-        className="bg-green-500 rounded-2xl py-4 items-center active:bg-green-600 flex-row justify-center gap-x-2"
+        onPress={async () => {
+          setLoading(true);
+          await updateOrderStatus(order.id, "delivered");
+          setLoading(false);
+        }}
+        disabled={loading}
+        className="bg-success rounded-2xl py-4 items-center active:opacity-80 flex-row justify-center gap-x-2 mt-4"
+        style={{ shadowColor: "#22c55e", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
       >
-        <Ionicons name="checkmark-circle-outline" size={20} color="white" />
-        <Text className="text-white font-bold text-base">Müşteriye Teslim Ettim</Text>
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <>
+            <Ionicons name="checkmark-circle-outline" size={20} color="white" />
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>Müşteriye Teslim Ettim</Text>
+          </>
+        )}
       </Pressable>
     );
   }
@@ -82,123 +110,144 @@ function NextActionButton({ order }: { order: Order }) {
   return null;
 }
 
-export default function ActiveOrderScreen() {
+function ActiveOrderCard({ order }: { order: Order }) {
   const router = useRouter();
-  const activeOrder = useOrderStore((s) => s.activeOrder);
-
-  if (!activeOrder) {
-    return (
-      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center" edges={["top"]}>
-        <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-4">
-          <Ionicons name="bicycle-outline" size={40} color="#d1d5db" />
-        </View>
-        <Text className="text-gray-500 font-semibold text-base">Aktif sipariş yok</Text>
-        <Text className="text-gray-400 text-sm mt-1 mb-6">
-          Siparişler sekmesinden sipariş kabul edin
-        </Text>
-        <Pressable
-          onPress={() => router.navigate("/(app)")}
-          className="bg-orange-500 px-6 py-3 rounded-xl active:bg-orange-600"
-        >
-          <Text className="text-white font-bold">Siparişlere Git</Text>
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
-
-  const statusClass = STATUS_COLORS[activeOrder.status];
+  const statusStyle = STATUS_COLORS[order.status];
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
-      <OfflineIndicator />
-
+    <View className="bg-dark-surface border border-dark-border rounded-2xl mb-6 overflow-hidden">
       {/* Header */}
-      <View className="flex-row items-center px-4 pt-2 pb-4 gap-x-3">
+      <View className="flex-row items-center px-4 py-3 bg-dark-base border-b border-dark-border gap-x-3">
         <View className="flex-1">
-          <Text className="text-gray-900 text-xl font-bold">Aktif Sipariş</Text>
-          <Text className="text-gray-400 text-xs">#{activeOrder.id}</Text>
+          <Text className="text-mtext-primary font-bold">#{order.id.slice(0, 8)}</Text>
         </View>
-        <View className={`px-3 py-1 rounded-full ${statusClass.split(" ")[0]}`}>
-          <Text className={`text-xs font-bold ${statusClass.split(" ")[1]}`}>
-            {STATUS_LABELS[activeOrder.status]}
+        <View className="px-3 py-1 rounded-full" style={{ backgroundColor: statusStyle.bg }}>
+          <Text className="text-xs font-bold" style={{ color: statusStyle.text }}>
+            {STATUS_LABELS[order.status]}
           </Text>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* Route card */}
-        <View className="bg-white mx-4 rounded-2xl p-4 shadow-sm border border-gray-100 mb-4">
-          <Text className="text-gray-900 font-bold mb-3">Güzergah</Text>
-          <RouteStep
-            icon="restaurant-outline"
-            iconBg="bg-orange-100"
-            title="Restoran"
-            address={`${activeOrder.restaurantName}\n${activeOrder.restaurantAddress}`}
-          />
-          <RouteStep
-            icon="location"
-            iconBg="bg-blue-50"
-            title="Müşteri"
-            address={`${activeOrder.customerName}\n${activeOrder.customerAddress}`}
-            isLast
-          />
-        </View>
+      <View className="p-4">
+        {/* Route */}
+        <Text className="text-mtext-primary font-bold mb-3">Güzergah</Text>
+        <RouteStep
+          icon="restaurant-outline"
+          iconColor="#f97316"
+          iconBg="#431407"
+          title="Restoran"
+          address={`${order.restaurantName}\n${order.restaurantAddress}`}
+        />
+        <RouteStep
+          icon="location"
+          iconColor="#3b82f6"
+          iconBg="#1e3a5f"
+          title="Müşteri"
+          address={`${order.customerName}\n${order.customerAddress}`}
+          isLast
+        />
+
+        {/* Distance & time */}
+        {(order.estimatedDistance || order.estimatedTime) && (
+          <View className="flex-row gap-x-3 mb-4 mt-2">
+            {order.estimatedDistance ? (
+              <View className="flex-1 bg-dark-base border border-dark-border rounded-xl py-3 items-center">
+                <Text className="text-accent font-bold text-base">{order.estimatedDistance}</Text>
+                <Text className="text-mtext-muted text-xs mt-0.5">Mesafe</Text>
+              </View>
+            ) : null}
+            {order.estimatedTime ? (
+              <View className="flex-1 bg-dark-base border border-dark-border rounded-xl py-3 items-center">
+                <Text className="text-blue-400 font-bold text-base">{order.estimatedTime}</Text>
+                <Text className="text-mtext-muted text-xs mt-0.5">Süre</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
 
         {/* Customer contact */}
-        <View className="bg-white mx-4 rounded-2xl p-4 shadow-sm border border-gray-100 mb-4">
-          <View className="flex-row items-center justify-between">
-            <View>
-              <Text className="text-gray-500 text-xs font-medium">Müşteri</Text>
-              <Text className="text-gray-900 font-bold text-base mt-0.5">{activeOrder.customerName}</Text>
-              <Text className="text-gray-500 text-sm">{activeOrder.customerPhone}</Text>
-            </View>
-            <Pressable
-              onPress={() => Linking.openURL(`tel:${activeOrder.customerPhone}`)}
-              className="w-12 h-12 rounded-full bg-green-500 items-center justify-center active:bg-green-600"
-            >
-              <Ionicons name="call" size={22} color="white" />
-            </Pressable>
+        <View className="flex-row items-center justify-between bg-dark-base rounded-xl p-3 border border-dark-border mb-4 mt-2">
+          <View>
+            <Text className="text-mtext-muted text-xs font-medium">Müşteri</Text>
+            <Text className="text-mtext-primary font-bold text-sm mt-0.5">{order.customerName}</Text>
+            <Text className="text-mtext-secondary text-xs mt-0.5">{order.customerPhone}</Text>
           </View>
+          <Pressable
+            onPress={() => Linking.openURL(`tel:${order.customerPhone}`)}
+            className="w-10 h-10 rounded-full bg-success items-center justify-center active:opacity-80"
+          >
+            <Ionicons name="call" size={18} color="white" />
+          </Pressable>
         </View>
 
         {/* Items */}
-        <View className="bg-white mx-4 rounded-2xl p-4 shadow-sm border border-gray-100 mb-4">
-          <Text className="text-gray-900 font-bold mb-3">Sipariş İçeriği</Text>
-          {activeOrder.items.map((item, idx) => (
-            <View
-              key={idx}
-              className="flex-row items-center justify-between py-1.5"
-            >
+        <View className="bg-dark-base border border-dark-border rounded-xl p-3 mb-4">
+          <Text className="text-mtext-primary font-bold text-xs mb-2">Sipariş İçeriği</Text>
+          {order.items.map((item, idx) => (
+            <View key={idx} className="flex-row items-center justify-between py-1">
               <View className="flex-row items-center gap-x-2 flex-1">
-                <View className="w-5 h-5 rounded bg-orange-100 items-center justify-center">
-                  <Text className="text-orange-600 text-xs font-bold">{item.quantity}</Text>
+                <View className="w-4 h-4 rounded bg-accent/20 items-center justify-center">
+                  <Text className="text-accent text-[10px] font-bold">{item.quantity}</Text>
                 </View>
-                <Text className="text-gray-700 text-sm flex-1">{item.name}</Text>
+                <Text className="text-mtext-secondary text-xs flex-1">{item.name}</Text>
               </View>
-              <Text className="text-gray-900 font-semibold text-sm">
-                ₺{(item.price * item.quantity).toFixed(0)}
-              </Text>
             </View>
           ))}
-          <View className="border-t border-gray-100 mt-2 pt-2 flex-row justify-between">
-            <Text className="text-gray-900 font-bold">Toplam</Text>
-            <Text className="text-orange-500 font-bold text-base">₺{activeOrder.totalAmount}</Text>
-          </View>
         </View>
 
         {/* Map button */}
         <Pressable
           onPress={() => router.navigate("/(app)/map")}
-          className="mx-4 bg-white border border-gray-200 rounded-2xl py-3.5 flex-row items-center justify-center gap-x-2 mb-4 active:bg-gray-50"
+          className="bg-dark-base border border-dark-border rounded-xl py-3 flex-row items-center justify-center gap-x-2 active:bg-dark-elevated"
         >
-          <Ionicons name="map-outline" size={18} color="#f97316" />
-          <Text className="text-orange-500 font-bold">Haritada Göster</Text>
+          <Ionicons name="map-outline" size={16} color="#f97316" />
+          <Text className="text-accent font-bold text-sm">Haritada Göster</Text>
         </Pressable>
 
-        {/* CTA */}
-        <View className="mx-4">
-          <NextActionButton order={activeOrder} />
+        <NextActionButton order={order} />
+      </View>
+    </View>
+  );
+}
+
+export default function ActiveOrderScreen() {
+  const router = useRouter();
+  const activeOrders = useOrderStore((s) => s.activeOrders);
+
+  if (!activeOrders || activeOrders.length === 0) {
+    return (
+      <SafeAreaView className="flex-1 bg-dark-base items-center justify-center" edges={["top"]}>
+        <View className="w-20 h-20 rounded-full bg-dark-surface border border-dark-border items-center justify-center mb-4">
+          <Ionicons name="bicycle-outline" size={40} color="#2a2a2a" />
         </View>
+        <Text className="text-mtext-secondary font-semibold text-base">Aktif sipariş yok</Text>
+        <Text className="text-mtext-muted text-sm mt-1 mb-6">
+          Siparişler sekmesinden sipariş kabul edin
+        </Text>
+        <Pressable
+          onPress={() => router.navigate("/(app)")}
+          className="bg-accent px-6 py-3 rounded-xl active:opacity-80"
+        >
+          <Text style={{ color: "white", fontWeight: "700" }}>Siparişlere Git</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-dark-base" edges={["top"]}>
+      <OfflineIndicator />
+
+      {/* Header */}
+      <View className="px-4 pt-2 pb-4 border-b border-dark-border mb-4">
+        <Text className="text-mtext-primary text-xl font-bold">Aktif Siparişler ({activeOrders.length})</Text>
+        <Text className="text-mtext-muted text-xs mt-1">Teslimat durumlarını aşağıdan güncelleyin</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
+        {activeOrders.map(order => (
+          <ActiveOrderCard key={order.id} order={order} />
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

@@ -6,7 +6,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
@@ -47,6 +47,12 @@
         "expo-notifications",
         {
           "color": "#f97316"
+        }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsDownloadToken": "${MAPBOX_SECRET_TOKEN}"
         }
       ]
     ]

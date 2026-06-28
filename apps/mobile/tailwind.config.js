@@ -9,13 +9,25 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: "#fff7ed",
-          100: "#ffedd5",
-          500: "#f97316",
-          600: "#ea580c",
-          700: "#c2410c",
+        dark: {
+          base:     "#0a0a0a",
+          surface:  "#141414",
+          elevated: "#1e1e1e",
+          border:   "#2a2a2a",
         },
+        accent: {
+          DEFAULT: "#f97316",
+          muted:   "#431407",
+          light:   "#fed7aa",
+        },
+        mtext: {
+          primary:   "#ffffff",
+          secondary: "#a1a1aa",
+          muted:     "#52525b",
+        },
+        success: "#22c55e",
+        warning: "#f59e0b",
+        danger:  "#ef4444",
       },
     },
   },

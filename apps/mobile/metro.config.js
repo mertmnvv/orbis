@@ -17,6 +17,15 @@ config.resolver.nodeModulesPaths = [
 // which bypasses nodeModulesPaths (relative paths skip that lookup).
 // Strip the prefix so it resolves as a bare specifier via nodeModulesPaths.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // @rnmapbox/maps'in `react-native` field'ı TypeScript source'a işaret eder
+  // (src/index) ama bu Metro ile uyumsuz. Pre-build CommonJS'i zorla.
+  if (moduleName === "@rnmapbox/maps") {
+    return {
+      type: "sourceFile",
+      filePath: require.resolve("@rnmapbox/maps/lib/commonjs/index"),
+    };
+  }
+
   const relNodeModules = moduleName.match(/^\.\/node_modules\/(.+)/);
   if (relNodeModules) {
     return context.resolveRequest(context, relNodeModules[1], platform);

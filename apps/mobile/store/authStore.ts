@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { supabase } from "../lib/supabase";
 
 interface User {
   id: string;
@@ -26,36 +27,53 @@ export const useAuthStore = create<AuthState>((set) => ({
   setPhone: (phone) => set({ phone }),
 
   sendOtp: async (phone) => {
-    // Production: const { error } = await supabase.auth.signInWithOtp({ phone });
-    console.log("[mock] Sending OTP to", phone);
-    await new Promise((r) => setTimeout(r, 800));
-    set({ otpSent: true, phone });
-    return { error: null };
+    const fullPhone = phone.startsWith("+") ? phone : `+90${phone}`;
+    const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
+    if (!error) set({ otpSent: true, phone: fullPhone });
+    return { error: error as Error | null };
   },
 
   verifyOtp: async (phone, token) => {
-    // Production: const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
-    console.log("[mock] Verifying OTP", token, "for", phone);
-    await new Promise((r) => setTimeout(r, 800));
-    if (token.length !== 6 || !/^\d+$/.test(token)) {
-      return { error: new Error("Invalid OTP. Enter the 6-digit code.") };
-    }
-    set({
-      user: { id: "mock-courier-001", phone },
-      otpSent: false,
-      isLoading: false,
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone,
+      token,
+      type: "sms",
     });
-    return { error: null };
+    if (!error && data.user) {
+      set({
+        user: { id: data.user.id, phone: data.user.phone ?? phone },
+        otpSent: false,
+        isLoading: false,
+      });
+    }
+    return { error: error as Error | null };
   },
 
   signOut: async () => {
-    // Production: await supabase.auth.signOut();
+    await supabase.auth.signOut();
     set({ user: null, otpSent: false, phone: "" });
   },
 
   initialize: async () => {
-    // Production: restore session from AsyncStorage via supabase.auth.getSession()
-    await new Promise((r) => setTimeout(r, 300));
-    set({ isLoading: false });
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.user) {
+      set({
+        user: { id: session.user.id, phone: session.user.phone ?? "" },
+        isLoading: false,
+      });
+    } else {
+      set({ isLoading: false });
+    }
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        set({ user: { id: session.user.id, phone: session.user.phone ?? "" } });
+      } else {
+        set({ user: null });
+      }
+    });
   },
 }));
