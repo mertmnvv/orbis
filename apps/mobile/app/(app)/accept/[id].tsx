@@ -22,6 +22,8 @@ let MapboxGL: typeof import("@rnmapbox/maps").default | null = null;
 if (!isExpoGo) {
   try {
     MapboxGL = require("@rnmapbox/maps").default;
+    // Harita render token'ı (yalnızca map:read scope'u olmalı).
+    // Directions/routing çağrıları /api/directions server proxy üzerinden geçer.
     MapboxGL!.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "");
   } catch {}
 }
@@ -51,6 +53,14 @@ export default function AcceptOrderScreen() {
     new Set(id ? [id] : [])
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(app)");
+    }
+  };
 
   // Reset isSubmitting whenever screen gains focus — handles the case where
   // the user navigates back via the hardware back button after tapping accept.
@@ -85,7 +95,7 @@ export default function AcceptOrderScreen() {
           Sipariş başkası tarafından alındı
         </Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={{
             marginTop: 20,
             paddingHorizontal: 20,
@@ -179,7 +189,7 @@ export default function AcceptOrderScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           disabled={isSubmitting}
           style={{
             width: 40,

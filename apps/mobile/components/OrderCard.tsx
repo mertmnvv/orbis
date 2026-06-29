@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useTheme } from "../hooks/useTheme";
 import { Order } from "../types";
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   nearbyCount?: number;
   onAccept: () => void;
   onReject: () => void;
+  isAccepting?: boolean;
 }
 
 function timeAgo(iso: string): string {
@@ -15,7 +17,8 @@ function timeAgo(iso: string): string {
   return `${diff} dk önce`;
 }
 
-export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props) {
+export function OrderCard({ order, nearbyCount = 0, onAccept, onReject, isAccepting }: Props) {
+  const { colors } = useTheme();
   const itemSummary =
     order.items.length === 1
       ? order.items[0].name
@@ -27,9 +30,9 @@ export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props)
       marginBottom: 12,
       borderRadius: 18,
       overflow: "hidden",
-      backgroundColor: "rgba(255,255,255,0.03)",
+      backgroundColor: colors.bg.card,
       borderWidth: 1,
-      borderColor: "rgba(255,255,255,0.07)",
+      borderColor: colors.border.DEFAULT,
     }}>
       {/* Header row */}
       <View style={{
@@ -54,19 +57,19 @@ export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props)
         </View>
         <View style={{ flex: 1 }}>
           <Text
-            style={{ color: "#ffffff", fontWeight: "700", fontSize: 15, letterSpacing: -0.2 }}
+            style={{ color: colors.text.primary, fontWeight: "700", fontSize: 15, letterSpacing: -0.2 }}
             numberOfLines={1}
           >
             {order.restaurantName}
           </Text>
           <Text
-            style={{ color: "#3f3f46", fontSize: 12, marginTop: 1 }}
+            style={{ color: colors.text.faint, fontSize: 12, marginTop: 1 }}
             numberOfLines={1}
           >
             {order.restaurantAddress}
           </Text>
         </View>
-        <Text style={{ color: "#2a2a2a", fontSize: 11, fontWeight: "600" }}>
+        <Text style={{ color: colors.border.muted, fontSize: 11, fontWeight: "600" }}>
           {timeAgo(order.createdAt)}
         </Text>
       </View>
@@ -98,13 +101,13 @@ export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props)
         </View>
         <View style={{ flex: 1 }}>
           <Text
-            style={{ color: "#e4e4e7", fontWeight: "600", fontSize: 14 }}
+            style={{ color: colors.text.secondary, fontWeight: "600", fontSize: 14 }}
             numberOfLines={1}
           >
             {order.customerName}
           </Text>
           <Text
-            style={{ color: "#3f3f46", fontSize: 12, marginTop: 1 }}
+            style={{ color: colors.text.faint, fontSize: 12, marginTop: 1 }}
             numberOfLines={1}
           >
             {order.customerAddress}
@@ -117,25 +120,25 @@ export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props)
         flexDirection: "row",
         alignItems: "center",
         borderTopWidth: 1,
-        borderTopColor: "rgba(255,255,255,0.05)",
+        borderTopColor: colors.border.subtle,
         paddingHorizontal: 14,
         paddingVertical: 10,
         gap: 12,
       }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Ionicons name="receipt-outline" size={12} color="#3f3f46" />
-          <Text style={{ color: "#52525b", fontSize: 12 }}>{itemSummary}</Text>
+          <Ionicons name="receipt-outline" size={12} color={colors.text.faint} />
+          <Text style={{ color: colors.text.muted, fontSize: 12 }}>{itemSummary}</Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Ionicons name="navigate-outline" size={12} color="#3f3f46" />
-          <Text style={{ color: "#52525b", fontSize: 12 }}>{order.estimatedDistance || "—"}</Text>
+          <Ionicons name="navigate-outline" size={12} color={colors.text.faint} />
+          <Text style={{ color: colors.text.muted, fontSize: 12 }}>{order.estimatedDistance || "—"}</Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Ionicons name="time-outline" size={12} color="#3f3f46" />
-          <Text style={{ color: "#52525b", fontSize: 12 }}>{order.estimatedTime || "—"}</Text>
+          <Ionicons name="time-outline" size={12} color={colors.text.faint} />
+          <Text style={{ color: colors.text.muted, fontSize: 12 }}>{order.estimatedTime || "—"}</Text>
         </View>
         <View style={{ flex: 1 }} />
-        <Text style={{ color: "#ffffff", fontWeight: "800", fontSize: 16, letterSpacing: -0.3 }}>
+        <Text style={{ color: colors.text.primary, fontWeight: "800", fontSize: 16, letterSpacing: -0.3 }}>
           ₺{order.totalAmount}
         </Text>
       </View>
@@ -146,13 +149,13 @@ export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props)
           flexDirection: "row",
           alignItems: "center",
           borderTopWidth: 1,
-          borderTopColor: "rgba(255,255,255,0.05)",
+          borderTopColor: colors.border.subtle,
           paddingHorizontal: 14,
           paddingVertical: 8,
           gap: 5,
         }}>
-          <Ionicons name="timer-outline" size={12} color="#71717a" />
-          <Text style={{ color: "#71717a", fontSize: 12 }}>
+          <Ionicons name="timer-outline" size={12} color={colors.text.muted} />
+          <Text style={{ color: colors.text.muted, fontSize: 12 }}>
             Ort. hazırlama: ~{order.restaurantAvgPrepTime} dk
           </Text>
         </View>
@@ -182,7 +185,7 @@ export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props)
       <View style={{
         flexDirection: "row",
         borderTopWidth: 1,
-        borderTopColor: "rgba(255,255,255,0.05)",
+        borderTopColor: colors.border.subtle,
       }}>
         <Pressable
           onPress={onReject}
@@ -200,14 +203,22 @@ export function OrderCard({ order, nearbyCount = 0, onAccept, onReject }: Props)
 
         <Pressable
           onPress={onAccept}
+          disabled={isAccepting}
           style={({ pressed }) => ({
             flex: 1,
             paddingVertical: 14,
             alignItems: "center",
             backgroundColor: pressed ? "rgba(249,115,22,0.08)" : "transparent",
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: 6,
           })}
         >
-          <Text style={{ color: "#f97316", fontWeight: "700", fontSize: 14 }}>İncele →</Text>
+          {isAccepting ? (
+            <ActivityIndicator size="small" color="#f97316" />
+          ) : (
+            <Text style={{ color: "#f97316", fontWeight: "700", fontSize: 14 }}>Kabul Et</Text>
+          )}
         </Pressable>
       </View>
     </View>

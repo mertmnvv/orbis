@@ -1,8 +1,9 @@
 export type Platform = 'yemeksepeti' | 'getir' | 'trendyol' | 'pakettaksi' | 'manual';
 export type OrderStatus = 'preparing' | 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
 export type VehicleType = 'bicycle' | 'motorcycle' | 'car' | 'scooter' | 'on_foot';
-export type PaymentMethod = 'cash' | 'card' | 'online_paid';
+export type PaymentMethod = 'cash' | 'card' | 'online_paid' | 'food_card' | 'split';
 export type PaymentStatus = 'not_required' | 'pending' | 'collected' | 'failed';
+export type PosSyncStatus = 'not_applicable' | 'pending' | 'synced' | 'failed';
 
 export interface Restaurant {
   id: string;
@@ -24,6 +25,7 @@ export interface MenuItem {
   description: string | null;
   price: number;
   is_available: boolean;
+  stock_count?: number | null;
   created_at: string;
 }
 
@@ -75,6 +77,13 @@ export interface Order {
   payment_status: PaymentStatus;
   payment_collected_at?: string | null;
   payment_notes?: string | null;
+  courier_status_note?: string | null;
+  customer_rating?: number | null;
+  customer_comment?: string | null;
+  pos_transaction_id?: string | null;
+  collected_amount?: number | null;
+  pos_sync_status?: PosSyncStatus | null;
+  pos_synced_at?: string | null;
   created_at: string;
   assigned_at: string | null;
   picked_up_at: string | null;

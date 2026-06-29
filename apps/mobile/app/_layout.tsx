@@ -5,6 +5,8 @@ import "../tasks/locationTask";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { useAuthStore } from "../store/authStore";
+import { useSyncQueue } from "../store/syncQueue";
+import { usePosStore } from "../store/posStore";
 
 export default function RootLayout() {
   const { user, isLoading, initialize } = useAuthStore();
@@ -12,7 +14,11 @@ export default function RootLayout() {
   const segments = useSegments();
 
   useEffect(() => {
-    initialize();
+    initialize().then(() => {
+      useSyncQueue.getState().hydrate();
+      useSyncQueue.getState().startNetworkListener();
+      usePosStore.getState().initializePos();
+    });
   }, []);
 
   useEffect(() => {

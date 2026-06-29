@@ -11,6 +11,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { useEffect, useRef } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
+import { supabase } from "../lib/supabase";
 import { useAuthStore } from "../store/authStore";
 import { useOrderStore } from "../store/orderStore";
 import { COURIER_LOCATION_TASK } from "../tasks/locationTask";
@@ -27,12 +28,15 @@ export function useLocationTracking() {
   useEffect(() => {
     if (hasActive && user) {
       // Arka plan görevinin kullanacağı değerleri AsyncStorage'a kaydet.
-      // Production'da: user.session.access_token kullan.
-      AsyncStorage.multiSet([
-        ["@orbis/courier_id", user.id],
-        ["@orbis/auth_token", "mock-token"],
-      ]);
-      startTracking();
+      supabase.auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token || "";
+        AsyncStorage.multiSet([
+          ["@orbis/courier_id", user.id],
+          ["@orbis/auth_token", token],
+        ]).then(() => {
+          startTracking();
+        });
+      });
     } else {
       stopTracking();
     }

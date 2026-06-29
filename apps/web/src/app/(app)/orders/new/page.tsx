@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Phone, Search, MapPin, ShoppingCart, Plus, Minus, ArrowLeft, Clock, User, AlertTriangle, CreditCard, Banknote, Wifi } from 'lucide-react';
+import { Phone, Search, MapPin, ShoppingCart, Plus, Minus, ArrowLeft, Clock, User, AlertTriangle, CreditCard, Banknote, Wifi, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -483,10 +483,11 @@ export default function NewOrderPage() {
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#71717a]">
                 Ödeme Yöntemi
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {([
                   { value: 'cash', label: 'Nakit', icon: Banknote, color: '#fbbf24' },
                   { value: 'card', label: 'Kart', icon: CreditCard, color: '#60a5fa' },
+                  { value: 'food_card', label: 'Yemek Kartı', icon: Wallet, color: '#818cf8' },
                   { value: 'online_paid', label: 'Online', icon: Wifi, color: '#22c55e' },
                 ] as const).map(({ value, label, icon: Icon, color }) => (
                   <button

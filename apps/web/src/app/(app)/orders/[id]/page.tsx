@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ChefHat, Banknote, CreditCard, Wifi, AlertTriangle } from 'lucide-react';
+import { ChefHat, Banknote, CreditCard, Wifi, AlertTriangle, Wallet, Split } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import type { OrderWithCourier } from '@/lib/types';
@@ -228,8 +228,14 @@ function PaymentSection({ order }: { order: OrderWithCourier }) {
     return <p className="text-xs text-[#52525b]">Ödeme bilgisi yok</p>;
   }
 
-  const methodLabel: Record<string, string> = { cash: 'Nakit', card: 'Kart', online_paid: 'Online Ödeme' };
-  const MethodIcon = method === 'cash' ? Banknote : method === 'card' ? CreditCard : Wifi;
+  const methodLabel: Record<string, string> = {
+    cash: 'Nakit',
+    card: 'Kart',
+    online_paid: 'Online Ödeme',
+    food_card: 'Yemek Kartı',
+    split: 'Parçalı Ödeme',
+  };
+  const MethodIcon = method === 'cash' ? Banknote : method === 'card' ? CreditCard : method === 'food_card' ? Wallet : method === 'split' ? Split : Wifi;
   const statusStyle: Record<string, { label: string; className: string }> = {
     not_required: { label: 'Ödeme Alınmayacak', className: 'text-emerald-400' },
     pending:      { label: 'Tahsilat Bekliyor',  className: 'text-amber-400' },
@@ -237,6 +243,25 @@ function PaymentSection({ order }: { order: OrderWithCourier }) {
     failed:       { label: 'Tahsilat Yapılamadı', className: 'text-red-400' },
   };
   const ss = statusStyle[status] ?? { label: status, className: 'text-[#a1a1aa]' };
+
+  // Parse split details if any
+  let splitDetails = null;
+  let successNote = '';
+  if (order.payment_notes && status === 'collected') {
+    if (order.payment_notes.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(order.payment_notes);
+        if (parsed.split) {
+          splitDetails = parsed.split;
+        }
+        if (parsed.note) {
+          successNote = parsed.note;
+        }
+      } catch {}
+    } else {
+      successNote = order.payment_notes;
+    }
+  }
 
   return (
     <div className="space-y-2">
@@ -255,6 +280,33 @@ function PaymentSection({ order }: { order: OrderWithCourier }) {
           </span>
         </div>
       )}
+      {splitDetails && (
+        <div className="rounded-lg bg-[#2a2a2a]/20 border border-[#2a2a2a] p-3 text-xs text-[#a1a1aa] mt-2 space-y-1.5">
+          <p className="font-semibold text-white">Parçalı Tahsilat Detayı:</p>
+          {splitDetails.cash > 0 && <p>• Nakit: {splitDetails.cash.toFixed(2)} ₺</p>}
+          {splitDetails.card > 0 && <p>• Kart: {splitDetails.card.toFixed(2)} ₺</p>}
+          {splitDetails.food_card > 0 && <p>• Yemek Kartı: {splitDetails.food_card.toFixed(2)} ₺</p>}
+          {successNote && <p className="italic mt-1 border-t border-[#2a2a2a] pt-1">Not: &quot;{successNote}&quot;</p>}
+        </div>
+      )}
+      {order.pos_transaction_id && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[#52525b]">POS İşlem No</span>
+          <span className="font-mono text-xs text-white">{order.pos_transaction_id}</span>
+        </div>
+      )}
+      {order.pos_sync_status && order.pos_sync_status !== 'not_applicable' && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[#52525b]">POS Senkron</span>
+          <span className={`text-xs font-semibold ${
+            order.pos_sync_status === 'synced' ? 'text-emerald-400' :
+            order.pos_sync_status === 'pending' ? 'text-amber-400' : 'text-red-400'
+          }`}>
+            {order.pos_sync_status === 'synced' ? 'Senkronize' :
+             order.pos_sync_status === 'pending' ? 'Bekliyor' : 'Senkron Hatası'}
+          </span>
+        </div>
+      )}
       {status === 'failed' && (
         <div className="flex flex-col gap-1.5 rounded-lg bg-red-500/10 px-2.5 py-2 text-xs text-red-400">
           <div className="flex items-center gap-1.5">
@@ -268,10 +320,10 @@ function PaymentSection({ order }: { order: OrderWithCourier }) {
           )}
         </div>
       )}
-      {status !== 'failed' && order.payment_notes && (
+      {status === 'collected' && !splitDetails && successNote && (
         <div className="rounded-lg bg-[#2a2a2a]/30 border border-[#2a2a2a] px-2.5 py-2 text-xs text-[#a1a1aa] mt-2">
           <p className="font-semibold text-white mb-0.5">Kurye Notu:</p>
-          <p className="italic">"{order.payment_notes}"</p>
+          <p className="italic">&quot;{successNote}&quot;</p>
         </div>
       )}
     </div>

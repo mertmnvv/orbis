@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ClipboardList, LogOut, Settings, Users, Map, BarChart3, UtensilsCrossed } from 'lucide-react';
+import { ClipboardList, LogOut, Settings, Users, Map, BarChart3, UtensilsCrossed, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/orders',     label: 'Siparişler',      icon: ClipboardList,   matchPaths: ['/orders'] },
   { href: '/couriers',   label: 'Kuryeler',        icon: Users,           matchPaths: ['/couriers'] },
   { href: '/menu',       label: 'Menü',            icon: UtensilsCrossed, matchPaths: ['/menu'] },
+  { href: '/analytics',  label: 'Analitik',        icon: TrendingUp,      matchPaths: ['/analytics'] },
   { href: '/zones',      label: 'Bölgeler',        icon: Map,             matchPaths: ['/zones'] },
   { href: '/settings',   label: 'Ayarlar',         icon: Settings,        matchPaths: ['/settings'] },
 ] as const;

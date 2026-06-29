@@ -16,7 +16,8 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
-      "@orbis/shared": ["../../packages/shared/src"]
+      "@orbis/shared": ["../../packages/shared/src"],
+      "@orbis/validators": ["../../packages/validators/src"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

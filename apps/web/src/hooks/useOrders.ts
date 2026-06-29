@@ -4,7 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { OrderWithCourierSchema } from '@orbis/validators';
 import type { OrderStatus, OrderWithCourier } from '@/lib/types';
+import { z } from 'zod';
+import { useAudioAlert } from './useAudioAlert';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   preparing: 'Hazırlanıyor',
@@ -27,7 +30,12 @@ async function fetchOrders(): Promise<OrderWithCourier[]> {
     `)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return data as OrderWithCourier[];
+
+  const parsed = z.array(OrderWithCourierSchema).safeParse(data);
+  if (!parsed.success) {
+    console.warn('[useOrders] Validation warnings:', parsed.error.flatten());
+  }
+  return (parsed.success ? parsed.data : data) as OrderWithCourier[];
 }
 
 export function useOrders() {
@@ -41,6 +49,7 @@ export function useOrders() {
 export function useRealtimeOrders() {
   const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
+  const playAlert = useAudioAlert('/sounds/bell.mp3');
 
   useEffect(() => {
     const channel = supabase
@@ -51,13 +60,15 @@ export function useRealtimeOrders() {
         (payload) => {
           queryClient.invalidateQueries({ queryKey: ['orders'] });
           if (payload.eventType === 'INSERT') {
-            toast.success('Yeni sipariş!', {
-              description: `Platform: ${(payload.new as any).platform}`,
-            });
+            const platform = String((payload.new as Record<string, unknown>).platform ?? '');
+            playAlert();
+            toast.success('Yeni sipariş!', { description: `Platform: ${platform}` });
           } else if (payload.eventType === 'UPDATE') {
-            const o = payload.new as any;
+            const row = payload.new as Record<string, unknown>;
+            const name = String(row.customer_name ?? '');
+            const status = String(row.status ?? '') as OrderStatus;
             toast.info('Sipariş güncellendi', {
-              description: `${o.customer_name} → ${STATUS_LABELS[o.status as OrderStatus] ?? o.status}`,
+              description: `${name} → ${STATUS_LABELS[status] ?? status}`,
             });
           }
         },

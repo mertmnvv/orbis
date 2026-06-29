@@ -1,7 +1,9 @@
 import * as Location from "expo-location";
 import { create } from "zustand";
-import { Order, OrderItem, OrderStatus, PaymentStatus, DeliveryZone } from "../types";
+import NetInfo from "@react-native-community/netinfo";
+import { Order, OrderItem, OrderStatus, PaymentStatus, PosSyncStatus, DeliveryZone, PaymentMethod } from "../types";
 import { supabase } from "../lib/supabase";
+import { useSyncQueue } from "./syncQueue";
 import { point } from "@turf/helpers";
 import distance from "@turf/distance";
 import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
@@ -13,18 +15,20 @@ async function fetchRouteFromCurrentLocation(
   destLng: number,
   destLat: number
 ): Promise<{ distance: string; duration: string } | null> {
-  const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-  if (!token) return null;
+  const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (!baseUrl) return null;
   try {
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${currentLng},${currentLat};${destLng},${destLat}?access_token=${token}&overview=false`;
-    const res = await fetch(url);
+    const params = new URLSearchParams({
+      originLng: String(currentLng),
+      originLat: String(currentLat),
+      destLng: String(destLng),
+      destLat: String(destLat),
+    });
+    const res = await fetch(`${baseUrl}/api/directions?${params}`);
     if (!res.ok) return null;
     const json = await res.json();
-    const route = json.routes?.[0];
-    if (!route) return null;
-    const km = (route.distance / 1000).toFixed(1);
-    const min = Math.ceil(route.duration / 60);
-    return { distance: `${km} km`, duration: `${min} dk` };
+    if (!json.distance || !json.duration) return null;
+    return { distance: json.distance, duration: json.duration };
   } catch {
     return null;
   }
@@ -45,7 +49,8 @@ interface OrderState {
   acceptOrders: (orderIds: string[]) => Promise<boolean>;
   rejectOrder: (orderId: string) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
-  recordPayment: (orderId: string, collected: boolean, notes?: string) => Promise<void>;
+  recordPayment: (orderId: string, collected: boolean, paymentMethod?: PaymentMethod, notes?: string, posTransactionId?: string, collectedAmount?: number) => Promise<void>;
+  updateCourierStatusNote: (orderId: string, note: string | null) => Promise<void>;
   fetchHistory: () => Promise<void>;
 }
 
@@ -80,6 +85,11 @@ function mapRow(row: Record<string, any>): Order {
     paymentStatus: row.payment_status ?? "pending",
     paymentCollectedAt: row.payment_collected_at ?? null,
     paymentNotes: row.payment_notes ?? null,
+    courierStatusNote: row.courier_status_note ?? null,
+    posTransactionId: row.pos_transaction_id ?? null,
+    collectedAmount: row.collected_amount ? Number(row.collected_amount) : null,
+    posSyncStatus: (row.pos_sync_status ?? "not_applicable") as PosSyncStatus,
+    posSyncedAt: row.pos_synced_at ?? null,
   };
 }
 
@@ -210,9 +220,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   },
 
   acceptOrder: async (orderId) => {
-    const order = get().availableOrders.find((o) => o.id === orderId);
-    if (!order) return;
-
     let courierId = get()._courierId;
     if (!courierId) {
       courierId = await getCourierId();
@@ -229,18 +236,16 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       })
       .eq("id", orderId);
 
-    if (!error) {
-      set((state) => ({
-        activeOrders: [...state.activeOrders, { ...order, status: "assigned" }],
-        availableOrders: state.availableOrders.filter((o) => o.id !== orderId),
-      }));
+    if (error) {
+      console.error("[acceptOrder] DB error:", error.message);
+      return;
     }
+
+    await get().initializeCourier();
+    await get().fetchAvailableOrders();
   },
 
   acceptOrders: async (orderIds) => {
-    const ordersToAccept = get().availableOrders.filter((o) => orderIds.includes(o.id));
-    if (ordersToAccept.length === 0) return false;
-
     let courierId = get()._courierId;
     if (!courierId) {
       courierId = await getCourierId();
@@ -262,11 +267,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       return false;
     }
 
-    const acceptedWithStatus = ordersToAccept.map(o => ({ ...o, status: "assigned" as OrderStatus }));
-    set((state) => ({
-      activeOrders: [...state.activeOrders, ...acceptedWithStatus],
-      availableOrders: state.availableOrders.filter((o) => !orderIds.includes(o.id)),
-    }));
+    await get().initializeCourier();
+    await get().fetchAvailableOrders();
 
     return true;
   },
@@ -348,28 +350,87 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     backgroundTask().catch((e) => console.error("[updateOrderStatus] backgroundTask threw:", e));
   },
 
-  recordPayment: async (orderId, collected, notes) => {
+  recordPayment: async (orderId, collected, paymentMethod, notes, posTransactionId, collectedAmount) => {
     const status: PaymentStatus = collected ? "collected" : "failed";
-    const updates: Record<string, any> = {
+    const posSyncStatus: PosSyncStatus = posTransactionId ? "pending" : "not_applicable";
+
+    // Optimistik güncelleme — her zaman, ağ durumundan bağımsız
+    set((state) => ({
+      activeOrders: state.activeOrders.map((o) =>
+        o.id === orderId
+          ? {
+              ...o,
+              paymentStatus: status,
+              paymentNotes: notes ?? null,
+              posTransactionId: posTransactionId ?? null,
+              collectedAmount: collectedAmount ?? null,
+              posSyncStatus,
+              ...(paymentMethod ? { paymentMethod } : {}),
+            }
+          : o
+      ),
+    }));
+
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      // Offline: kuyruğa al
+      await useSyncQueue.getState().enqueue({
+        orderId,
+        operation: "recordPayment",
+        payload: { collected, paymentMethod, notes, posTransactionId, collectedAmount },
+      });
+      return;
+    }
+
+    // Online: direkt Supabase'e yaz
+    const updates: Record<string, unknown> = {
       payment_status: status,
       payment_collected_at: collected ? new Date().toISOString() : null,
     };
-    if (notes !== undefined) {
-      updates.payment_notes = notes;
+    if (paymentMethod) updates.payment_method = paymentMethod;
+    if (notes !== undefined) updates.payment_notes = notes;
+    if (posTransactionId) {
+      updates.pos_transaction_id = posTransactionId;
+      updates.collected_amount = collectedAmount;
+      updates.pos_sync_status = "synced";
+      updates.pos_synced_at = new Date().toISOString();
     }
-    const { error } = await supabase
-      .from("orders")
-      .update(updates)
-      .eq("id", orderId);
+
+    const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
     if (error) {
       console.error("[recordPayment] DB error:", error.message);
-      return;
+      // Fallback: kuyruğa al
+      await useSyncQueue.getState().enqueue({
+        orderId,
+        operation: "recordPayment",
+        payload: { collected, paymentMethod, notes, posTransactionId, collectedAmount },
+      });
+    } else if (posTransactionId) {
+      // Supabase'e yazıldı, Zustand'ı güncelle
+      set((state) => ({
+        activeOrders: state.activeOrders.map((o) =>
+          o.id === orderId ? { ...o, posSyncStatus: "synced" as PosSyncStatus } : o
+        ),
+      }));
     }
+  },
+
+  updateCourierStatusNote: async (orderId, note) => {
+    // Optimistic update
     set((state) => ({
       activeOrders: state.activeOrders.map((o) =>
-        o.id === orderId ? { ...o, paymentStatus: status, paymentNotes: notes ?? null } : o
+        o.id === orderId ? { ...o, courierStatusNote: note } : o
       ),
     }));
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ courier_status_note: note })
+      .eq("id", orderId);
+
+    if (error) {
+      console.error("[updateCourierStatusNote] DB error:", error.message);
+    }
   },
 
   fetchHistory: async () => {

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { MapPin, CheckCircle, Banknote, CreditCard, Wifi } from 'lucide-react';
+import { MapPin, CheckCircle, Banknote, CreditCard, Wifi, HelpCircle, PhoneOff, AlertTriangle, Navigation, AlertCircle, Wallet, Split, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { StatusBadge } from '@/components/orders/StatusBadge';
@@ -31,6 +32,16 @@ const PAYMENT_METHOD_ICON: Record<PaymentMethod, typeof Banknote> = {
   cash: Banknote,
   card: CreditCard,
   online_paid: Wifi,
+  food_card: Wallet,
+  split: Split,
+};
+
+const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  cash: 'Nakit',
+  card: 'Kart',
+  online_paid: 'Online',
+  food_card: 'Yemek Kartı',
+  split: 'Parçalı',
 };
 
 const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; className: string }> = {
@@ -43,10 +54,16 @@ const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; className: st
 function PaymentStatusBadge({ method, status }: { method: PaymentMethod; status: PaymentStatus }) {
   const Icon = PAYMENT_METHOD_ICON[method];
   const style = PAYMENT_STATUS_STYLE[status];
+  
+  let label = style.label;
+  if (status === 'collected') {
+    label = `Tahsil Edildi (${PAYMENT_METHOD_LABEL[method]})`;
+  }
+
   return (
     <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold', style.className)}>
       <Icon className="h-2.5 w-2.5" />
-      {style.label}
+      {label}
     </span>
   );
 }
@@ -71,18 +88,45 @@ function useMarkReady() {
   });
 }
 
-interface OrderCardProps {
-  order: OrderWithCourier;
+function CourierStatusNoteBadge({ note }: { note: string }) {
+  let Icon = AlertCircle;
+  let className = "text-amber-400 bg-amber-500/10 border-amber-500/20";
+
+  if (note === "Adresi bulamadım") {
+    Icon = HelpCircle;
+    className = "text-amber-400 bg-amber-500/10 border-amber-500/20";
+  } else if (note === "Müşteriye ulaşılamıyor") {
+    Icon = PhoneOff;
+    className = "text-red-400 bg-red-500/10 border-red-500/20";
+  } else if (note === "Yolda kaldım (Arıza)") {
+    Icon = AlertTriangle;
+    className = "text-red-400 bg-red-500/10 border-red-500/20";
+  } else if (note === "Dönüş yolundayım") {
+    Icon = Navigation;
+    className = "text-blue-400 bg-blue-500/10 border-blue-500/20";
+  }
+
+  return (
+    <div className={cn("flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold mt-2", className)}>
+      <Icon className="h-3.5 w-3.5" />
+      <span>{note}</span>
+    </div>
+  );
 }
 
-export function OrderCard({ order }: OrderCardProps) {
+interface OrderCardProps {
+  order: OrderWithCourier;
+  onSelect?: (order: OrderWithCourier) => void;
+}
+
+export function OrderCard({ order, onSelect }: OrderCardProps) {
   const eta = calcETA(order);
   const borderColor = STATUS_BORDER[order.status] ?? 'border-l-[#2a2a2a]';
   const markReady = useMarkReady();
 
   return (
     <div className="relative group">
-      <Link href={`/orders/${order.id}`} className="block">
+      <div onClick={() => onSelect?.(order)} className="block">
         <div
           className={cn(
             'cursor-pointer border border-[#2a2a2a] bg-[#141414] transition-all duration-200 hover:bg-[#1e1e1e] hover:border-[#3a3a3a] rounded-xl border-l-4',
@@ -124,6 +168,11 @@ export function OrderCard({ order }: OrderCardProps) {
               )}
             </div>
 
+            {/* Courier status note */}
+            {order.courier_status_note && (
+              <CourierStatusNoteBadge note={order.courier_status_note} />
+            )}
+
             {/* Prep time indicator for preparing orders */}
             {order.status === 'preparing' && order.estimated_ready_at && (
               <div className="rounded-lg bg-[#422006]/50 px-3 py-1.5 text-xs text-[#fb923c]">
@@ -160,7 +209,7 @@ export function OrderCard({ order }: OrderCardProps) {
             </div>
           </div>
         </div>
-      </Link>
+      </div>
 
       {/* "Hazır" action for preparing orders — rendered outside link to avoid nesting */}
       {order.status === 'preparing' && (
@@ -177,6 +226,49 @@ export function OrderCard({ order }: OrderCardProps) {
           {markReady.isPending ? 'İşleniyor...' : 'Hazır — Kurye Kuyruğuna Al'}
         </button>
       )}
+
+      {/* "Otomatik Ata" action for pending orders without a courier */}
+      {order.status === 'pending' && !order.courier_id && (
+        <AutoAssignButton orderId={order.id} />
+      )}
     </div>
+  );
+}
+
+function AutoAssignButton({ orderId }: { orderId: string }) {
+  const qc = useQueryClient();
+  const [loading, setLoading] = useState(false);
+
+  async function handleAutoAssign(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      const res = await fetch('/api/orders/auto-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast.success(`Kurye atandı: ${data.courier?.name ?? 'En yakın kurye'}`);
+        qc.invalidateQueries({ queryKey: ['orders'] });
+      } else {
+        toast.error(data.error ?? 'Atama başarısız');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleAutoAssign}
+      disabled={loading}
+      className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500/10 border border-blue-500/20 py-2 text-sm font-medium text-blue-400 hover:bg-blue-500/20 disabled:opacity-50 transition-colors"
+    >
+      <Zap className="h-4 w-4" />
+      {loading ? 'Atanıyor...' : 'Otomatik Kurye Ata'}
+    </button>
   );
 }

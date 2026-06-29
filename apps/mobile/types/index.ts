@@ -6,8 +6,9 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
-export type PaymentMethod = "cash" | "card" | "online_paid";
+export type PaymentMethod = "cash" | "card" | "online_paid" | "food_card" | "split";
 export type PaymentStatus = "not_required" | "pending" | "collected" | "failed";
+export type PosSyncStatus = "not_applicable" | "pending" | "synced" | "failed";
 
 export interface OrderItem {
   name: string;
@@ -44,6 +45,27 @@ export interface Order {
   paymentStatus: PaymentStatus;
   paymentCollectedAt?: string | null;
   paymentNotes?: string | null;
+  courierStatusNote?: string | null;
+  posTransactionId?: string | null;
+  collectedAmount?: number | null;
+  posSyncStatus: PosSyncStatus;
+  posSyncedAt?: string | null;
+}
+
+export interface SyncQueueItem {
+  id: string;
+  orderId: string;
+  operation: "recordPayment";
+  payload: {
+    collected: boolean;
+    paymentMethod?: PaymentMethod;
+    notes?: string;
+    posTransactionId?: string;
+    collectedAmount?: number;
+  };
+  createdAt: string;
+  attempts: number;
+  lastAttemptAt?: string;
 }
 
 export interface CourierLocation {

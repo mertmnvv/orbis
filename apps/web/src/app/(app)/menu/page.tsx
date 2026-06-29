@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
-import { Plus, Pencil, Trash2, Check, X, ToggleLeft, ToggleRight, UtensilsCrossed, FolderPlus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, ToggleLeft, ToggleRight, UtensilsCrossed, FolderPlus, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMenuItems, useCreateMenuItem, useUpdateMenuItem, useDeleteMenuItem } from '@/hooks/useMenuItems';
 import { useAuth } from '@/providers/AuthProvider';
@@ -33,6 +33,7 @@ interface EditingItem {
   description: string;
   price: string;
   is_available: boolean;
+  stock_count: string;
 }
 
 const EMPTY_FORM: EditingItem = {
@@ -41,6 +42,7 @@ const EMPTY_FORM: EditingItem = {
   description: '',
   price: '',
   is_available: true,
+  stock_count: '',
 };
 
 export default function MenuPage() {
@@ -115,6 +117,7 @@ export default function MenuPage() {
       description: item.description ?? '',
       price: String(item.price),
       is_available: item.is_available,
+      stock_count: item.stock_count != null ? String(item.stock_count) : '',
     });
   }
 
@@ -131,6 +134,7 @@ export default function MenuPage() {
       return;
     }
     try {
+      const stock = editingItem.stock_count === '' ? null : parseInt(editingItem.stock_count, 10);
       await updateItem.mutateAsync({
         id: editingId,
         name: editingItem.name.trim(),
@@ -138,6 +142,7 @@ export default function MenuPage() {
         price,
         category: editingItem.category.trim() || 'Genel',
         is_available: editingItem.is_available,
+        stock_count: isNaN(stock as number) ? null : stock,
       });
       toast.success('Ürün güncellendi');
       cancelEdit();
@@ -165,6 +170,7 @@ export default function MenuPage() {
       return;
     }
     const categoryName = newForm.category.trim() || activeCategory || 'Genel';
+    const newStock = newForm.stock_count === '' ? null : parseInt(newForm.stock_count, 10);
     try {
       await createItem.mutateAsync({
         restaurant_id: restaurantId,
@@ -173,6 +179,7 @@ export default function MenuPage() {
         price,
         category: categoryName,
         is_available: newForm.is_available,
+        stock_count: isNaN(newStock as number) ? null : newStock,
       });
       toast.success('Ürün eklendi');
       // Remove from drafts once an item is actually created in this category
@@ -361,6 +368,17 @@ export default function MenuPage() {
                 onChange={(e) => setNewForm((f) => ({ ...f, description: e.target.value }))}
                 className="col-span-2 rounded-lg border border-[#2a2a2a] bg-[#141414] px-3 py-2 text-sm text-white placeholder-[#52525b] focus:border-[#f97316] focus:outline-none"
               />
+              <div className="col-span-2">
+                <input
+                  placeholder="Stok adedi (boş = sınırsız)"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={newForm.stock_count}
+                  onChange={(e) => setNewForm((f) => ({ ...f, stock_count: e.target.value }))}
+                  className="w-full rounded-lg border border-[#2a2a2a] bg-[#141414] px-3 py-2 text-sm text-white placeholder-[#52525b] focus:border-[#f97316] focus:outline-none"
+                />
+              </div>
             </div>
             <div className="mt-3 flex items-center justify-between">
               <label className="flex items-center gap-2 text-sm text-[#a1a1aa] cursor-pointer">
@@ -442,6 +460,15 @@ export default function MenuPage() {
                       placeholder="Açıklama"
                       className="col-span-2 rounded-lg border border-[#2a2a2a] bg-[#141414] px-3 py-2 text-sm text-white placeholder-[#52525b] focus:border-[#f97316] focus:outline-none"
                     />
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editingItem.stock_count}
+                      onChange={(e) => setEditingItem((f) => f && ({ ...f, stock_count: e.target.value }))}
+                      placeholder="Stok (boş = sınırsız)"
+                      className="col-span-2 rounded-lg border border-[#2a2a2a] bg-[#141414] px-3 py-2 text-sm text-white placeholder-[#52525b] focus:border-[#f97316] focus:outline-none"
+                    />
                   </div>
                   <div className="mt-3 flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm text-[#a1a1aa] cursor-pointer">
@@ -477,6 +504,12 @@ export default function MenuPage() {
                       {!item.is_available && (
                         <span className="rounded-full bg-[#2a2a2a] px-2 py-0.5 text-xs text-[#71717a]">
                           Tükendi
+                        </span>
+                      )}
+                      {item.stock_count != null && item.is_available && (
+                        <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${item.stock_count <= 3 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-[#1e1e1e] text-[#52525b]'}`}>
+                          <Package className="h-2.5 w-2.5" />
+                          {item.stock_count}
                         </span>
                       )}
                     </div>

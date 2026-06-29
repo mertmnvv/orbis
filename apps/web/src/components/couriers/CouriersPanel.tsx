@@ -400,7 +400,7 @@ export function CouriersPanel() {
               {couriers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-[#52525b]">
-                    Restoranınıza bağlı kurye yok. "Kurye Ekle" ile telefon numarası girin.
+                    Restoranınıza bağlı kurye yok. &quot;Kurye Ekle&quot; ile telefon numarası girin.
                   </td>
                 </tr>
               ) : (

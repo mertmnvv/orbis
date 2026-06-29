@@ -24,6 +24,7 @@ export const MOCK_ORDERS: Order[] = [
     estimatedTime: "12 dk",
     paymentMethod: "cash",
     paymentStatus: "pending",
+    posSyncStatus: "not_applicable",
   },
   {
     id: "order-2",
@@ -47,6 +48,7 @@ export const MOCK_ORDERS: Order[] = [
     estimatedTime: "15 dk",
     paymentMethod: "card",
     paymentStatus: "pending",
+    posSyncStatus: "not_applicable",
   },
   {
     id: "order-3",
@@ -70,6 +72,7 @@ export const MOCK_ORDERS: Order[] = [
     estimatedTime: "20 dk",
     paymentMethod: "online_paid",
     paymentStatus: "not_required",
+    posSyncStatus: "not_applicable",
   },
 ];
 
@@ -96,6 +99,7 @@ export const MOCK_HISTORY: Order[] = [
     estimatedTime: "25 dk",
     paymentMethod: "cash",
     paymentStatus: "collected",
+    posSyncStatus: "not_applicable",
   },
   {
     id: "hist-2",
@@ -119,6 +123,7 @@ export const MOCK_HISTORY: Order[] = [
     estimatedTime: "30 dk",
     paymentMethod: "card",
     paymentStatus: "collected",
+    posSyncStatus: "not_applicable",
   },
   {
     id: "hist-3",
@@ -142,5 +147,6 @@ export const MOCK_HISTORY: Order[] = [
     estimatedTime: "10 dk",
     paymentMethod: "online_paid",
     paymentStatus: "not_required",
+    posSyncStatus: "not_applicable",
   },
 ];
