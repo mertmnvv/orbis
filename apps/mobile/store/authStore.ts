@@ -34,8 +34,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setPhone: (phone) => set({ phone }),
 
   sendOtp: async (phone) => {
+    const useRealOtp = process.env.EXPO_PUBLIC_USE_REAL_OTP === "true";
     // Geliştirme bypass: SMS göndermeden direkt OTP ekranına geç
-    if (__DEV__) {
+    if (__DEV__ && !useRealOtp) {
       const fullPhone = phone.startsWith("+") ? phone : `+90${phone}`;
       set({ otpSent: true, phone: fullPhone });
       return { error: null };
@@ -48,8 +49,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   verifyOtp: async (phone, token) => {
+    const useRealOtp = process.env.EXPO_PUBLIC_USE_REAL_OTP === "true";
     // Geliştirme bypass: "000000" kodu → tek bir sabit test hesabıyla giriş
-    if (__DEV__ && token === "000000") {
+    if (__DEV__ && token === "000000" && !useRealOtp) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: "devtest@orbiscourier.com",
         password: "OrbisTest2024!",
