@@ -18,8 +18,13 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   cancelled: 'İptal',
 };
 
-async function fetchOrders(): Promise<OrderWithCourier[]> {
-  const { data, error } = await supabase
+interface OrdersFilter {
+  startDate?: string; // ISO string
+  endDate?: string;   // ISO string
+}
+
+async function fetchOrders(filter?: OrdersFilter): Promise<OrderWithCourier[]> {
+  let query = supabase
     .from('orders')
     .select(`
       *,
@@ -29,6 +34,15 @@ async function fetchOrders(): Promise<OrderWithCourier[]> {
       )
     `)
     .order('created_at', { ascending: false });
+
+  if (filter?.startDate) {
+    query = query.gte('created_at', filter.startDate);
+  }
+  if (filter?.endDate) {
+    query = query.lte('created_at', filter.endDate);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
 
   const parsed = z.array(OrderWithCourierSchema).safeParse(data);
@@ -38,10 +52,10 @@ async function fetchOrders(): Promise<OrderWithCourier[]> {
   return (parsed.success ? parsed.data : data) as OrderWithCourier[];
 }
 
-export function useOrders() {
+export function useOrders(filter?: OrdersFilter) {
   return useQuery<OrderWithCourier[]>({
-    queryKey: ['orders'],
-    queryFn: fetchOrders,
+    queryKey: ['orders', filter?.startDate ?? null, filter?.endDate ?? null],
+    queryFn: () => fetchOrders(filter),
     staleTime: 30_000,
   });
 }
@@ -58,7 +72,7 @@ export function useRealtimeOrders() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
-          queryClient.invalidateQueries({ queryKey: ['orders'] });
+          queryClient.invalidateQueries({ queryKey: ['orders'], exact: false });
           if (payload.eventType === 'INSERT') {
             const platform = String((payload.new as Record<string, unknown>).platform ?? '');
             playAlert();

@@ -873,7 +873,16 @@ export default function HomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={signOut}
+            onPress={() => {
+              Alert.alert(
+                'Çıkış Yap',
+                'Çıkış yapmak istediğinize emin misiniz?',
+                [
+                  { text: 'İptal', style: 'cancel' },
+                  { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
+                ],
+              );
+            }}
             style={{
               width: 40,
               height: 40,

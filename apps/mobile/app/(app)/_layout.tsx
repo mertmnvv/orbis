@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { useLocationTracking } from "../../hooks/useLocationTracking";
 import { useOrderStore } from "../../store/orderStore";
 import { useAuthStore } from "../../store/authStore";
@@ -35,7 +35,16 @@ export default function AppLayout() {
           Yönetici tarafından hesabınız devre dışı bırakılmıştır. Lütfen restoran yönetimi veya destek ekibi ile iletişime geçiniz.
         </Text>
         <Pressable
-          onPress={signOut}
+          onPress={() => {
+            Alert.alert(
+              'Çıkış Yap',
+              'Çıkış yapmak istediğinize emin misiniz?',
+              [
+                { text: 'İptal', style: 'cancel' },
+                { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
+              ],
+            );
+          }}
           style={{
             flexDirection: "row",
             alignItems: "center",

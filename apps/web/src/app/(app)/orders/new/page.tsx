@@ -45,8 +45,31 @@ function pointInPolygon(pt: [number, number], ring: [number, number][]): boolean
   return inside;
 }
 
-async function geocodeAddress(address: string, token: string): Promise<{ lat: number; lng: number; label: string } | null> {
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${token}&country=TR&language=tr&limit=1`;
+async function geocodeAddress(
+  address: string,
+  token: string,
+  restaurantCoords?: { lat: number; lng: number },
+): Promise<{ lat: number; lng: number; label: string } | null> {
+  // ~30 km offset in degrees (1° lat ≈ 111 km, 1° lng ≈ ~85 km at 40°N)
+  const KM_RADIUS = 30;
+  const LAT_OFFSET = KM_RADIUS / 111;
+  const LNG_OFFSET = KM_RADIUS / 85;
+
+  let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${token}&country=TR&language=tr&limit=1`;
+
+  if (restaurantCoords) {
+    // Proximity: bias results towards the restaurant location
+    url += `&proximity=${restaurantCoords.lng},${restaurantCoords.lat}`;
+    // Bounding box: hard-limit results to ~30 km around the restaurant
+    const bbox = [
+      restaurantCoords.lng - LNG_OFFSET,
+      restaurantCoords.lat - LAT_OFFSET,
+      restaurantCoords.lng + LNG_OFFSET,
+      restaurantCoords.lat + LAT_OFFSET,
+    ].join(',');
+    url += `&bbox=${bbox}`;
+  }
+
   const res = await fetch(url);
   if (!res.ok) return null;
   const json = await res.json();
@@ -182,7 +205,10 @@ export default function NewOrderPage() {
     if (!token || !address.trim()) return;
     setIsGeocoding(true);
     try {
-      const result = await geocodeAddress(address.trim(), token);
+      const coords = restaurant?.lat && restaurant?.lng
+        ? { lat: Number(restaurant.lat), lng: Number(restaurant.lng) }
+        : undefined;
+      const result = await geocodeAddress(address.trim(), token, coords);
       if (result) {
         const activeZones = zones.filter((z) => z.is_active);
         if (activeZones.length > 0) {
@@ -200,7 +226,7 @@ export default function NewOrderPage() {
         setAddress(result.label);
         toast.success('Adres haritada bulundu');
       } else {
-        toast.error('Adres bulunamadı');
+        toast.error('Adres yakın çevrede bulunamadı — adresi detaylandırın');
       }
     } catch {
       toast.error('Geocoding başarısız');

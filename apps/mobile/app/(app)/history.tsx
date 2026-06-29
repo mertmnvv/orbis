@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   RefreshControl,
   SectionList,
   Text,
@@ -29,6 +30,8 @@ function formatTime(iso: string): string {
 }
 
 function HistoryCard({ order }: { order: Order }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <View
       className="mx-4 mb-3 bg-dark-surface rounded-2xl overflow-hidden border border-dark-border"
@@ -113,6 +116,50 @@ function HistoryCard({ order }: { order: Order }) {
           <View className="flex-1" />
           <Text className="text-mtext-primary font-bold text-sm">₺{order.totalAmount}</Text>
         </View>
+
+        {/* Expandable items section */}
+        <Pressable
+          onPress={() => setExpanded(!expanded)}
+          className="mt-3 flex-row items-center justify-center gap-x-1.5 bg-dark-base/60 rounded-xl py-2.5 border border-dark-border/50"
+        >
+          <Ionicons
+            name={expanded ? "chevron-up-outline" : "receipt-outline"}
+            size={14}
+            color="#f97316"
+          />
+          <Text className="text-accent text-xs font-semibold">
+            {expanded ? "Gizle" : "İçeriği Göster"}
+          </Text>
+        </Pressable>
+
+        {expanded && (
+          <View className="mt-2 bg-dark-base/40 rounded-xl border border-dark-border/30 overflow-hidden">
+            {order.items.map((item, idx) => (
+              <View
+                key={idx}
+                className={`flex-row items-center justify-between px-3 py-2.5 ${
+                  idx < order.items.length - 1 ? "border-b border-dark-border/20" : ""
+                }`}
+              >
+                <View className="flex-row items-center gap-x-2 flex-1">
+                  <View className="bg-accent/10 w-6 h-6 rounded-lg items-center justify-center">
+                    <Text className="text-accent text-xs font-bold">{item.quantity}x</Text>
+                  </View>
+                  <Text className="text-mtext-secondary text-xs font-medium flex-1" numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                </View>
+                <Text className="text-mtext-muted text-xs font-semibold ml-2">
+                  ₺{(item.price * item.quantity).toFixed(2)}
+                </Text>
+              </View>
+            ))}
+            <View className="flex-row items-center justify-between px-3 py-2.5 bg-dark-surface/50 border-t border-dark-border/30">
+              <Text className="text-mtext-secondary text-xs font-bold">Toplam</Text>
+              <Text className="text-accent text-sm font-bold">₺{order.totalAmount}</Text>
+            </View>
+          </View>
+        )}
       </View>
     </View>
   );
