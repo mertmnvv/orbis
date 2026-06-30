@@ -21,6 +21,9 @@ import {
   ToggleRight,
   UserPlus,
   UserMinus,
+  Mail,
+  Key,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -68,8 +71,10 @@ export function CouriersPanel() {
 
   const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [claimPhone, setClaimPhone] = useState('');
+  const [claimEmail, setClaimEmail] = useState('');
   const [claimName, setClaimName] = useState('');
   const [claimLoading, setClaimLoading] = useState(false);
+  const [createdCourierCreds, setCreatedCourierCreds] = useState<{ email: string; password: string } | null>(null);
 
   // Resolve the restaurant belonging to the logged-in admin user, then fetch couriers
   useEffect(() => {
@@ -222,7 +227,10 @@ export function CouriersPanel() {
   };
 
   const handleClaimCourier = async () => {
-    if (!claimPhone.trim() || !restaurantId) return;
+    if (!claimPhone.trim() || !claimEmail.trim() || !claimName.trim() || !restaurantId) {
+      toast.error('Lütfen tüm alanları doldurun (İsim, Telefon, E-posta).');
+      return;
+    }
     setClaimLoading(true);
 
     // Normalize to E.164 format (+90XXXXXXXXXX) so it matches what Supabase Auth stores
@@ -241,61 +249,36 @@ export function CouriersPanel() {
     }
 
     try {
-      // RLS: restaurant admin can UPDATE unassigned couriers (restaurant_id IS NULL).
-      // We can't SELECT them first, so we do a blind UPDATE filtered by phone + unassigned.
-      const { data: claimed, error: claimError } = await supabase
-        .from('couriers')
-        .update({ restaurant_id: restaurantId })
-        .eq('phone', normalizedPhone)
-        .is('restaurant_id', null)
-        .select('id, name')
-        .maybeSingle();
-
-      if (claimError) throw claimError;
-
-      if (claimed) {
-        toast.success(`${claimed.name} restoranınıza eklendi`);
-        setClaimModalOpen(false);
-        setClaimPhone('');
-        setClaimName('');
-        return;
-      }
-
-      // No unassigned courier found — check if already in our restaurant
-      const { data: existing } = await supabase
-        .from('couriers')
-        .select('name')
-        .eq('restaurant_id', restaurantId)
-        .eq('phone', normalizedPhone)
-        .maybeSingle();
-
-      if (existing) {
-        toast.error(`${existing.name} zaten restoranınıza bağlı`);
-        return;
-      }
-
-      // Pre-register: courier not in system yet, create the row now
-      const { error: insertError } = await supabase
-        .from('couriers')
-        .insert({
+      // Call secure next API route to create courier account
+      const res = await fetch('/api/couriers/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: claimEmail.trim(),
           phone: normalizedPhone,
-          name: claimName.trim() || 'Bilinmiyor',
-          restaurant_id: restaurantId,
-          vehicle_type: 'motorcycle',
-          is_active: true,
-        });
+          name: claimName.trim(),
+        }),
+      });
 
-      if (insertError) throw insertError;
+      const data = await res.json();
 
-      toast.success(
-        `${claimName.trim() || normalizedPhone} sisteme eklendi. Kurye giriş yapabilir.`,
-      );
+      if (!res.ok) {
+        throw new Error(data.error || 'Kurye eklenirken bir hata oluştu');
+      }
+
+      toast.success(`${claimName.trim()} başarıyla eklendi!`);
       setClaimModalOpen(false);
       setClaimPhone('');
       setClaimName('');
-    } catch (err) {
+      setClaimEmail('');
+
+      // Show generated credentials modal
+      setCreatedCourierCreds({ email: data.email, password: data.password });
+    } catch (err: any) {
       console.error('Kurye eklenirken hata:', err);
-      toast.error('Kurye eklenirken bir hata oluştu');
+      toast.error(err.message || 'Kurye eklenirken bir hata oluştu');
     } finally {
       setClaimLoading(false);
     }
@@ -476,11 +459,17 @@ export function CouriersPanel() {
                       </td>
 
                       {/* İletişim */}
-                      <td className="px-6 py-4 text-[#a1a1aa]">
+                      <td className="px-6 py-4 text-[#a1a1aa] space-y-1">
                         <div className="flex items-center gap-1.5 font-mono text-xs">
                           <Phone className="h-3.5 w-3.5 text-[#52525b]" />
                           <span>{courier.phone}</span>
                         </div>
+                        {courier.email && (
+                          <div className="flex items-center gap-1.5 text-xs text-[#71717a]">
+                            <Mail className="h-3.5 w-3.5 text-[#52525b]" />
+                            <span>{courier.email}</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Araç Tipi */}
@@ -582,6 +571,24 @@ export function CouriersPanel() {
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#a1a1aa]">
+                  Ad Soyad
+                </label>
+                <input
+                  type="text"
+                  value={claimName}
+                  onChange={(e) => setClaimName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleClaimCourier();
+                    if (e.key === 'Escape') setClaimModalOpen(false);
+                  }}
+                  placeholder="ör. Ahmet Yılmaz"
+                  autoFocus
+                  className="w-full rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] py-2.5 px-3 text-sm text-white placeholder-[#3f3f46] outline-none focus:border-[#f97316] transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#a1a1aa]">
                   Telefon Numarası
                 </label>
                 <div className="flex overflow-hidden rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] focus-within:border-[#f97316] transition-colors">
@@ -598,7 +605,6 @@ export function CouriersPanel() {
                       if (e.key === 'Escape') setClaimModalOpen(false);
                     }}
                     placeholder="5XX XXX XX XX"
-                    autoFocus
                     className="flex-1 bg-transparent py-2.5 px-3 text-sm text-white placeholder-[#3f3f46] outline-none"
                   />
                 </div>
@@ -606,19 +612,24 @@ export function CouriersPanel() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#a1a1aa]">
-                  Ad Soyad <span className="text-[#3f3f46] normal-case font-normal">(isteğe bağlı)</span>
+                  E-posta Adresi
                 </label>
-                <input
-                  type="text"
-                  value={claimName}
-                  onChange={(e) => setClaimName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleClaimCourier();
-                    if (e.key === 'Escape') setClaimModalOpen(false);
-                  }}
-                  placeholder="ör. Ahmet Yılmaz"
-                  className="w-full rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] py-2.5 px-3 text-sm text-white placeholder-[#3f3f46] outline-none focus:border-[#f97316] transition-colors"
-                />
+                <div className="flex overflow-hidden rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] focus-within:border-[#f97316] transition-colors">
+                  <div className="flex items-center gap-1.5 border-r border-[#2a2a2a] bg-[#141414] px-3">
+                    <Mail className="h-3.5 w-3.5 text-[#52525b]" />
+                  </div>
+                  <input
+                    type="email"
+                    value={claimEmail}
+                    onChange={(e) => setClaimEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleClaimCourier();
+                      if (e.key === 'Escape') setClaimModalOpen(false);
+                    }}
+                    placeholder="ornek@orbis.com"
+                    className="flex-1 bg-transparent py-2.5 px-3 text-sm text-white placeholder-[#3f3f46] outline-none"
+                  />
+                </div>
               </div>
             </div>
 
@@ -628,6 +639,7 @@ export function CouriersPanel() {
                   setClaimModalOpen(false);
                   setClaimPhone('');
                   setClaimName('');
+                  setClaimEmail('');
                 }}
                 className="flex-1 rounded-lg border border-[#2a2a2a] bg-transparent py-2.5 text-sm font-medium text-[#a1a1aa] hover:border-[#3a3a3a] hover:text-white transition-colors"
               >
@@ -635,10 +647,62 @@ export function CouriersPanel() {
               </button>
               <button
                 onClick={handleClaimCourier}
-                disabled={claimLoading || !claimPhone.trim()}
+                disabled={claimLoading || !claimPhone.trim() || !claimEmail.trim() || !claimName.trim()}
                 className="flex-1 rounded-lg bg-[#f97316] py-2.5 text-sm font-semibold text-white hover:bg-[#ea6c0e] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {claimLoading ? 'Ekleniyor...' : 'Kaydet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Şifre Gösterme Modalı */}
+      {createdCourierCreds && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border border-[#2a2a2a] bg-[#141414] p-6 shadow-2xl">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="rounded-lg bg-green-500/10 p-2 text-green-400">
+                <Key className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white">Kurye Giriş Bilgileri</h2>
+                <p className="text-xs text-[#a1a1aa] mt-0.5">Lütfen bu bilgileri kuryeye iletin.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 bg-[#1e1e1e] p-4 rounded-lg border border-[#2a2a2a] font-mono text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[#71717a]">E-posta:</span>
+                <span className="text-white font-semibold">{createdCourierCreds.email}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-[#2a2a2a] pt-2">
+                <span className="text-[#71717a]">Şifre:</span>
+                <span className="text-[#f97316] font-bold">{createdCourierCreds.password}</span>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-lg bg-orange-500/5 border border-orange-500/10 p-3 text-[11px] text-orange-400 leading-normal">
+              ℹ️ Kurye e-postasına gönderilen <strong>doğrulama linkine</strong> tıkladıktan sonra bu bilgilerle giriş yapabilir.
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => {
+                  const text = `E-posta: ${createdCourierCreds.email}\nŞifre: ${createdCourierCreds.password}`;
+                  navigator.clipboard.writeText(text);
+                  toast.success('Giriş bilgileri panoya kopyalandı');
+                }}
+                className="flex-1 rounded-lg border border-[#2a2a2a] bg-transparent py-2.5 text-sm font-medium text-white hover:border-[#3a3a3a] transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Copy className="h-4 w-4" />
+                Kopyala
+              </button>
+              <button
+                onClick={() => setCreatedCourierCreds(null)}
+                className="flex-1 rounded-lg bg-[#f97316] py-2.5 text-sm font-semibold text-white hover:bg-[#ea6c0e] transition-colors"
+              >
+                Kapat
               </button>
             </div>
           </div>

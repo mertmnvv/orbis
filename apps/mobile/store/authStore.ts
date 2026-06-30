@@ -3,20 +3,19 @@ import { supabase } from "../lib/supabase";
 
 interface User {
   id: string;
+  email: string;
   phone: string;
+  name: string;
 }
 
 interface AuthState {
   user: User | null;
   isLoading: boolean;
-  otpSent: boolean;
-  phone: string;
   isAvailable: boolean;
   isActive: boolean;
   restaurantId: string | null;
-  setPhone: (phone: string) => void;
-  sendOtp: (phone: string) => Promise<{ error: Error | null }>;
-  verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  changePassword: (newPassword: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   initialize: () => Promise<void>;
   toggleAvailability: () => Promise<void>;
@@ -25,115 +24,105 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoading: true,
-  otpSent: false,
-  phone: "",
   isAvailable: true,
   isActive: true,
   restaurantId: null,
 
-  setPhone: (phone) => set({ phone }),
-
-  sendOtp: async (phone) => {
+  signIn: async (email, password) => {
+    set({ isLoading: true });
+    
+    // Geliştirme bypass: "devtest@orbiscourier.com" ve "000000" ile bypass giriş
     const useRealOtp = process.env.EXPO_PUBLIC_USE_REAL_OTP === "true";
-    // Geliştirme bypass: SMS göndermeden direkt OTP ekranına geç
-    if (__DEV__ && !useRealOtp) {
-      const fullPhone = phone.startsWith("+") ? phone : `+90${phone}`;
-      set({ otpSent: true, phone: fullPhone });
-      return { error: null };
-    }
-
-    const fullPhone = phone.startsWith("+") ? phone : `+90${phone}`;
-    const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
-    if (!error) set({ otpSent: true, phone: fullPhone });
-    return { error: error as Error | null };
-  },
-
-  verifyOtp: async (phone, token) => {
-    const useRealOtp = process.env.EXPO_PUBLIC_USE_REAL_OTP === "true";
-    // Geliştirme bypass: "000000" kodu → tek bir sabit test hesabıyla giriş
-    if (__DEV__ && token === "000000" && !useRealOtp) {
+    if (__DEV__ && password === "000000" && !useRealOtp) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: "devtest@orbiscourier.com",
         password: "OrbisTest2024!",
       });
-      if (!error && data.user) {
-        const { data: courier } = await supabase
-          .from('couriers')
-          .select('is_available, is_active, restaurant_id')
-          .eq('user_id', data.user.id)
-          .maybeSingle();
-
-        if (!courier) {
-          await supabase.auth.signOut();
-          return {
-            error: new Error(
-              "Dev kurye satırı bulunamadı. Supabase'de couriers tablosunda\n" +
-              "user_id = devtest kullanıcısı olan bir satır olmalı."
-            ),
-          };
-        }
-
-        set({
-          user: { id: data.user.id, phone },
-          isAvailable: courier.is_available ?? true,
-          isActive: courier.is_active ?? true,
-          restaurantId: courier.restaurant_id ?? null,
-          otpSent: false,
-          isLoading: false,
-        });
-        return { error: null };
+      if (error) {
+        set({ isLoading: false });
+        return { error };
       }
-      return {
-        error: new Error(
-          "Dev kullanıcısı bulunamadı. Supabase → Authentication → Users'dan\n" +
-          "Email: devtest@orbiscourier.com  Password: OrbisTest2024! ekle."
-        ),
-      };
-    }
-
-    const { data, error } = await supabase.auth.verifyOtp({
-      phone,
-      token,
-      type: "sms",
-    });
-    if (!error && data.user) {
-      const userPhone = data.user.phone ?? phone;
-
-      // Link user_id to pre-registered courier row if not already linked
-      // (handles couriers who had an auth account before being pre-registered)
-      const { error: rpcError } = await supabase.rpc('link_courier_user_id', { p_phone: userPhone });
-      if (rpcError) console.warn('[verifyOtp] link_courier_user_id failed:', rpcError.message);
-
-      const { data: courier } = await supabase
-        .from('couriers')
-        .select('is_available, is_active, restaurant_id')
-        .eq('user_id', data.user.id)
+      
+      const { data: courier, error: courierErr } = await supabase
+        .from("couriers")
+        .select("name, phone, email, is_available, is_active, restaurant_id")
+        .eq("user_id", data.user!.id)
         .maybeSingle();
 
-      if (!courier) {
+      if (courierErr || !courier) {
         await supabase.auth.signOut();
+        set({ isLoading: false });
+        return { error: new Error("Kurye kaydı bulunamadı.") };
+      }
+
+      set({
+        user: {
+          id: data.user!.id,
+          email: data.user!.email ?? "",
+          phone: courier.phone ?? "",
+          name: courier.name ?? "",
+        },
+        isAvailable: courier.is_available ?? true,
+        isActive: courier.is_active ?? true,
+        restaurantId: courier.restaurant_id ?? null,
+        isLoading: false,
+      });
+      return { error: null };
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    if (error) {
+      set({ isLoading: false });
+      return { error };
+    }
+
+    if (data.user) {
+      // link user_id by email if not already linked (fallback/signup trigger backup)
+      await supabase.rpc("link_courier_user_id_by_email", { p_email: data.user.email });
+
+      const { data: courier, error: courierErr } = await supabase
+        .from("couriers")
+        .select("name, phone, email, is_available, is_active, restaurant_id")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      if (courierErr || !courier) {
+        await supabase.auth.signOut();
+        set({ isLoading: false });
         return {
-          error: new Error(
-            'Bu numara sisteme kayıtlı değil.\nRestoran yöneticinizden sizi eklemesini isteyin.'
-          ),
+          error: new Error("Hesabınız sisteme bağlı bir kurye olarak tanımlı değil."),
         };
       }
 
       set({
-        user: { id: data.user.id, phone: userPhone },
+        user: {
+          id: data.user.id,
+          email: data.user.email ?? "",
+          phone: courier.phone ?? "",
+          name: courier.name ?? "",
+        },
         isAvailable: courier.is_available ?? true,
         isActive: courier.is_active ?? true,
         restaurantId: courier.restaurant_id ?? null,
-        otpSent: false,
         isLoading: false,
       });
     }
+
+    return { error: null };
+  },
+
+  changePassword: async (newPassword) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     return { error: error as Error | null };
   },
 
   signOut: async () => {
     await supabase.auth.signOut();
-    set({ user: null, otpSent: false, phone: "", isAvailable: true, isActive: true, restaurantId: null });
+    set({ user: null, isAvailable: true, isActive: true, restaurantId: null });
   },
 
   toggleAvailability: async () => {
@@ -158,16 +147,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     let channelUserId: string | null = null;
 
     const setupRealtime = (userId: string) => {
-      // Guard: skip if already subscribed for this user to prevent
-      // "cannot add callbacks after subscribe()" when onAuthStateChange
-      // fires immediately after initialize with the same session.
       if (channelUserId === userId) return;
       channelUserId = userId;
       if (channel) {
         supabase.removeChannel(channel);
         channel = null;
       }
-      // Unique channel name (Date.now) avoids Supabase client-side cache reuse.
       channel = supabase
         .channel(`courier-${userId}-${Date.now()}`)
         .on(
@@ -195,7 +180,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (session?.user) {
       const { data: courier } = await supabase
         .from('couriers')
-        .select('is_available, is_active, restaurant_id')
+        .select('name, phone, email, is_available, is_active, restaurant_id')
         .eq('user_id', session.user.id)
         .maybeSingle();
 
@@ -206,7 +191,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       set({
-        user: { id: session.user.id, phone: session.user.phone ?? "" },
+        user: {
+          id: session.user.id,
+          email: session.user.email ?? "",
+          phone: courier.phone ?? "",
+          name: courier.name ?? "",
+        },
         isAvailable: courier.is_available ?? true,
         isActive: courier.is_active ?? true,
         restaurantId: courier.restaurant_id ?? null,
@@ -222,7 +212,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (session?.user) {
         const { data: courier } = await supabase
           .from('couriers')
-          .select('is_available, is_active, restaurant_id')
+          .select('name, phone, email, is_available, is_active, restaurant_id')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
@@ -232,7 +222,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         set({
-          user: { id: session.user.id, phone: session.user.phone ?? "" },
+          user: {
+            id: session.user.id,
+            email: session.user.email ?? "",
+            phone: courier.phone ?? "",
+            name: courier.name ?? "",
+          },
           isAvailable: courier.is_available ?? true,
           isActive: courier.is_active ?? true,
           restaurantId: courier.restaurant_id ?? null,

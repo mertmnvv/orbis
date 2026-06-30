@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthStore } from "../../store/authStore";
+import { Ionicons } from "@expo/vector-icons";
 
 function OrbisIcon({ size = 72 }: { size?: number }) {
   const sc = size / 100;
@@ -17,7 +18,6 @@ function OrbisIcon({ size = 72 }: { size?: number }) {
   const outerR = 42 * sc;
   const innerR = 24 * sc;
   const sw = 5.5 * sc;
-  // Diagonal: (17,76)→(70,23) in 100×100 space → exactly -45°, length=53√2
   const lineLen = Math.sqrt(2) * 53 * sc;
   const lineSw = 6 * sc;
   const lineCx = 43.5 * sc;
@@ -66,226 +66,43 @@ function OrbisIcon({ size = 72 }: { size?: number }) {
 }
 
 export default function LoginScreen() {
-  const { phone, setPhone, otpSent, sendOtp, verifyOtp } = useAuthStore();
-  const [otp, setOtp] = useState("");
+  const { signIn } = useAuthStore();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const otpInputRef = useRef<TextInput>(null);
 
-  const handleSendOtp = async () => {
-    if (phone.length < 10) {
-      setError("Geçerli bir telefon numarası girin.");
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+
+  const validateEmail = (text: string) => {
+    const reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w\w+)+$/;
+    return reg.test(text.trim());
+  };
+
+  const handleLogin = async () => {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !validateEmail(cleanEmail)) {
+      setError("Lütfen geçerli bir e-posta adresi girin.");
       return;
     }
-    setError(null);
-    setLoading(true);
-    const { error: err } = await sendOtp(phone);
-    setLoading(false);
-    if (err) setError(err.message);
-  };
-
-  const handleVerify = async () => {
-    if (otp.length !== 6) {
-      setError("6 haneli kodu girin.");
+    if (!password) {
+      setError("Lütfen şifrenizi girin.");
       return;
     }
+
     setError(null);
     setLoading(true);
-    const { error: err } = await verifyOtp(phone, otp);
+    const { error: err } = await signIn(cleanEmail, password);
     setLoading(false);
-    if (err) setError(err.message);
+    
+    if (err) {
+      setError(err.message || "Giriş başarısız. Bilgilerinizi kontrol edin.");
+    }
   };
 
-  const handleOtpChange = (val: string) => {
-    setError(null);
-    const cleaned = val.replace(/\D/g, "").slice(0, 6);
-    setOtp(cleaned);
-    if (cleaned.length === 6) handleVerifyAuto(cleaned);
-  };
-
-  const handleVerifyAuto = async (code: string) => {
-    setError(null);
-    setLoading(true);
-    const { error: err } = await verifyOtp(phone, code);
-    setLoading(false);
-    if (err) setError(err.message);
-  };
-
-  if (otpSent) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#080808" }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-        >
-          <View style={{ flex: 1, paddingHorizontal: 24 }}>
-            {/* Back button */}
-            <Pressable
-              onPress={() => {
-                setOtp("");
-                setError(null);
-                useAuthStore.setState({ otpSent: false });
-              }}
-              style={{
-                marginTop: 16,
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                backgroundColor: "rgba(255,255,255,0.05)",
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.08)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ color: "#a1a1aa", fontSize: 18 }}>←</Text>
-            </Pressable>
-
-            {/* Title */}
-            <View style={{ marginTop: 40, marginBottom: 40 }}>
-              <Text style={{ color: "#ffffff", fontSize: 28, fontWeight: "800", marginBottom: 12, letterSpacing: -0.5 }}>
-                Kodu girin
-              </Text>
-              {__DEV__ ? (
-                <View style={{
-                  backgroundColor: "rgba(249,115,22,0.08)",
-                  borderWidth: 1,
-                  borderColor: "rgba(249,115,22,0.2)",
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 10,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                }}>
-                  <Text style={{ fontSize: 13 }}>🛠</Text>
-                  <Text style={{ color: "#f97316", fontSize: 13, fontWeight: "600" }}>
-                    Dev modu — <Text style={{ fontWeight: "800" }}>000000</Text> kodunu gir
-                  </Text>
-                </View>
-              ) : (
-                <Text style={{ color: "#52525b", fontSize: 15, lineHeight: 22 }}>
-                  <Text style={{ color: "#a1a1aa", fontWeight: "600" }}>+90 {phone}</Text>
-                  {" "}numarasına gönderilen{"\n"}6 haneli kodu girin.
-                </Text>
-              )}
-            </View>
-
-            {/* OTP boxes */}
-            <Pressable onPress={() => otpInputRef.current?.focus()}>
-              <View style={{ flexDirection: "row", gap: 10, justifyContent: "center", marginBottom: 16 }}>
-                {Array.from({ length: 6 }).map((_, i) => {
-                  const char = otp[i];
-                  const isFocused = otp.length === i;
-                  return (
-                    <View
-                      key={i}
-                      style={{
-                        width: 48,
-                        height: 58,
-                        borderRadius: 14,
-                        borderWidth: char || isFocused ? 1.5 : 1,
-                        borderColor: char
-                          ? "#f97316"
-                          : isFocused
-                          ? "rgba(249,115,22,0.5)"
-                          : "rgba(255,255,255,0.07)",
-                        backgroundColor: char
-                          ? "rgba(249,115,22,0.07)"
-                          : "rgba(255,255,255,0.03)",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {char ? (
-                        <Text style={{ color: "#ffffff", fontSize: 22, fontWeight: "700" }}>{char}</Text>
-                      ) : isFocused ? (
-                        <View style={{ width: 2, height: 22, backgroundColor: "#f97316", borderRadius: 1 }} />
-                      ) : null}
-                    </View>
-                  );
-                })}
-              </View>
-            </Pressable>
-
-            {/* Hidden real input */}
-            <TextInput
-              ref={otpInputRef}
-              value={otp}
-              onChangeText={handleOtpChange}
-              keyboardType="number-pad"
-              maxLength={6}
-              autoFocus
-              style={{ position: "absolute", opacity: 0, width: 1, height: 1 }}
-            />
-
-            {/* Error */}
-            {error && (
-              <View style={{
-                backgroundColor: "rgba(239,68,68,0.08)",
-                borderWidth: 1,
-                borderColor: "rgba(239,68,68,0.2)",
-                borderRadius: 12,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                marginBottom: 12,
-              }}>
-                <Text style={{ color: "#ef4444", fontSize: 13, textAlign: "center" }}>{error}</Text>
-              </View>
-            )}
-
-            {/* Bottom actions */}
-            <View style={{ marginTop: "auto", paddingBottom: 32 }}>
-              <Pressable
-                onPress={handleVerify}
-                disabled={loading || otp.length !== 6}
-                style={{
-                  borderRadius: 16,
-                  height: 56,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: otp.length === 6 ? "#f97316" : "rgba(255,255,255,0.04)",
-                  borderWidth: otp.length === 6 ? 0 : 1,
-                  borderColor: "rgba(255,255,255,0.07)",
-                  shadowColor: "#f97316",
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: otp.length === 6 ? 0.25 : 0,
-                  shadowRadius: 16,
-                  elevation: otp.length === 6 ? 4 : 0,
-                }}
-              >
-                {loading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={{
-                    color: otp.length === 6 ? "#ffffff" : "#3f3f46",
-                    fontWeight: "700",
-                    fontSize: 16,
-                    letterSpacing: 0.2,
-                  }}>
-                    Doğrula
-                  </Text>
-                )}
-              </Pressable>
-
-              <Pressable
-                onPress={() => {
-                  setOtp("");
-                  setError(null);
-                  useAuthStore.setState({ otpSent: false });
-                }}
-                style={{ marginTop: 16, alignItems: "center" }}
-              >
-                <Text style={{ color: "#f97316", fontSize: 14, fontWeight: "600" }}>
-                  Farklı numara kullan
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    );
-  }
+  const isFormValid = email.trim().length > 0 && password.length > 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#080808" }}>
@@ -296,7 +113,7 @@ export default function LoginScreen() {
         <View style={{ flex: 1, paddingHorizontal: 24 }}>
 
           {/* Logo + Branding */}
-          <View style={{ alignItems: "center", marginTop: 72, marginBottom: 52 }}>
+          <View style={{ alignItems: "center", marginTop: 60, marginBottom: 40 }}>
             {/* Glow ring */}
             <View style={{
               position: "absolute",
@@ -340,129 +157,185 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {/* Phone Form */}
-          <View>
-            <Text style={{
-              color: "#52525b",
-              fontSize: 10,
-              fontWeight: "700",
-              marginBottom: 10,
-              letterSpacing: 1.5,
-              textTransform: "uppercase",
-            }}>
-              Telefon Numarası
-            </Text>
-
-            <View style={{
-              flexDirection: "row",
-              borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.07)",
-              borderRadius: 16,
-              backgroundColor: "rgba(255,255,255,0.03)",
-              overflow: "hidden",
-              height: 56,
-            }}>
-              <View style={{
-                paddingHorizontal: 16,
-                borderRightWidth: 1,
-                borderRightColor: "rgba(255,255,255,0.06)",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "rgba(255,255,255,0.02)",
+          {/* Form */}
+          <View style={{ gap: 18 }}>
+            {/* Email Input */}
+            <View>
+              <Text style={{
+                color: "#52525b",
+                fontSize: 10,
+                fontWeight: "700",
+                marginBottom: 8,
+                letterSpacing: 1.5,
+                textTransform: "uppercase",
               }}>
-                <Text style={{ color: "#52525b", fontWeight: "700", fontSize: 15 }}>+90</Text>
+                E-posta Adresi
+              </Text>
+              <View style={{
+                flexDirection: "row",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.07)",
+                borderRadius: 16,
+                backgroundColor: "rgba(255,255,255,0.03)",
+                overflow: "hidden",
+                alignItems: "center",
+                height: 56,
+              }}>
+                <View style={{ paddingHorizontal: 16 }}>
+                  <Ionicons name="mail-outline" size={18} color="#52525b" />
+                </View>
+                <TextInput
+                  ref={emailInputRef}
+                  style={{
+                    flex: 1,
+                    color: "#ffffff",
+                    fontSize: 16,
+                    fontWeight: "500",
+                    height: "100%",
+                  }}
+                  placeholder="ornek@orbis.com"
+                  placeholderTextColor="#2a2a2a"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={(t) => {
+                    setError(null);
+                    setEmail(t);
+                  }}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordInputRef.current?.focus()}
+                />
               </View>
-              <TextInput
-                style={{
-                  flex: 1,
-                  paddingHorizontal: 16,
-                  color: "#ffffff",
-                  fontSize: 17,
-                  fontWeight: "500",
-                }}
-                placeholder="5XX XXX XX XX"
-                placeholderTextColor="#2a2a2a"
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={(t) => {
-                  setError(null);
-                  setPhone(t.replace(/\D/g, "").slice(0, 10));
-                }}
-                maxLength={10}
-              />
-              {phone.length > 0 && (
-                <Pressable
-                  onPress={() => { setPhone(""); setError(null); }}
-                  style={{ paddingHorizontal: 16, alignItems: "center", justifyContent: "center" }}
-                >
-                  <View style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 10,
-                    backgroundColor: "rgba(255,255,255,0.08)",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}>
-                    <Text style={{ color: "#52525b", fontSize: 11, lineHeight: 20 }}>✕</Text>
-                  </View>
-                </Pressable>
-              )}
             </View>
+
+            {/* Password Input */}
+            <View>
+              <Text style={{
+                color: "#52525b",
+                fontSize: 10,
+                fontWeight: "700",
+                marginBottom: 8,
+                letterSpacing: 1.5,
+                textTransform: "uppercase",
+              }}>
+                Şifre
+              </Text>
+              <View style={{
+                flexDirection: "row",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.07)",
+                borderRadius: 16,
+                backgroundColor: "rgba(255,255,255,0.03)",
+                overflow: "hidden",
+                alignItems: "center",
+                height: 56,
+              }}>
+                <View style={{ paddingHorizontal: 16 }}>
+                  <Ionicons name="key-outline" size={18} color="#52525b" />
+                </View>
+                <TextInput
+                  ref={passwordInputRef}
+                  style={{
+                    flex: 1,
+                    color: "#ffffff",
+                    fontSize: 16,
+                    fontWeight: "500",
+                    height: "100%",
+                  }}
+                  placeholder="••••••••"
+                  placeholderTextColor="#2a2a2a"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={password}
+                  onChangeText={(t) => {
+                    setError(null);
+                    setPassword(t);
+                  }}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                />
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={{ paddingHorizontal: 16, height: "100%", justifyContent: "center" }}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#52525b"
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {__DEV__ && (
+              <View style={{
+                backgroundColor: "rgba(249,115,22,0.08)",
+                borderWidth: 1,
+                borderColor: "rgba(249,115,22,0.2)",
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}>
+                <Ionicons name="construct-outline" size={16} color="#f97316" />
+                <Text style={{ color: "#f97316", fontSize: 12, fontWeight: "600", flex: 1 }}>
+                  Dev Modu: Test hesabı ile girmek için şifreye <Text style={{ fontWeight: "800" }}>000000</Text> yazın.
+                </Text>
+              </View>
+            )}
 
             {error && (
               <View style={{
-                marginTop: 10,
                 backgroundColor: "rgba(239,68,68,0.08)",
                 borderWidth: 1,
                 borderColor: "rgba(239,68,68,0.2)",
                 borderRadius: 12,
                 paddingHorizontal: 14,
                 paddingVertical: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
               }}>
-                <Text style={{ color: "#ef4444", fontSize: 13 }}>{error}</Text>
+                <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
+                <Text style={{ color: "#ef4444", fontSize: 13, flex: 1 }}>{error}</Text>
               </View>
             )}
           </View>
 
           {/* Bottom */}
           <View style={{ marginTop: "auto", paddingBottom: 32 }}>
-            {/* Divider */}
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, gap: 12 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.05)" }} />
-              <Text style={{ color: "#2a2a2a", fontSize: 10, fontWeight: "600", letterSpacing: 1 }}>
-                DEVAM
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.05)" }} />
-            </View>
-
             <Pressable
-              onPress={handleSendOtp}
-              disabled={loading || phone.length < 10}
+              onPress={handleLogin}
+              disabled={loading || !isFormValid}
               style={{
                 borderRadius: 16,
                 height: 56,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: phone.length >= 10 ? "#f97316" : "rgba(255,255,255,0.04)",
-                borderWidth: phone.length >= 10 ? 0 : 1,
+                backgroundColor: isFormValid ? "#f97316" : "rgba(255,255,255,0.04)",
+                borderWidth: isFormValid ? 0 : 1,
                 borderColor: "rgba(255,255,255,0.07)",
                 shadowColor: "#f97316",
                 shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: phone.length >= 10 ? 0.28 : 0,
+                shadowOpacity: isFormValid ? 0.28 : 0,
                 shadowRadius: 20,
-                elevation: phone.length >= 10 ? 5 : 0,
+                elevation: isFormValid ? 5 : 0,
               }}
             >
               {loading ? (
                 <ActivityIndicator color="white" />
               ) : (
                 <Text style={{
-                  color: phone.length >= 10 ? "#ffffff" : "#3f3f46",
+                  color: isFormValid ? "#ffffff" : "#3f3f46",
                   fontWeight: "700",
                   fontSize: 16,
                   letterSpacing: 0.2,
                 }}>
-                  Devam Et
+                  Giriş Yap
                 </Text>
               )}
             </Pressable>

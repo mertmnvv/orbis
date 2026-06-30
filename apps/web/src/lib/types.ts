@@ -46,6 +46,7 @@ export interface Courier {
   restaurant_id: string | null;
   name: string;
   phone: string;
+  email?: string | null;
   vehicle_type: VehicleType;
   is_active: boolean;
   is_available: boolean;

@@ -744,6 +744,37 @@ export default function HomeScreen() {
 
   const [activeTab, setActiveTab] = useState<"pending" | "active">("pending");
 
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
+
+  const changePassword = useAuthStore((s) => s.changePassword);
+
+  const handleChangePasswordSubmit = async () => {
+    if (newPassword.length < 6) {
+      Alert.alert("Hata", "Şifre en az 6 karakter olmalıdır.");
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      Alert.alert("Hata", "Şifreler uyuşmuyor.");
+      return;
+    }
+
+    setPasswordChangeLoading(true);
+    const { error } = await changePassword(newPassword);
+    setPasswordChangeLoading(false);
+
+    if (error) {
+      Alert.alert("Hata", error.message || "Şifre değiştirilemedi.");
+    } else {
+      Alert.alert("Başarılı", "Şifreniz başarıyla güncellendi.");
+      setShowPasswordModal(false);
+      setNewPassword("");
+      setNewPasswordConfirm("");
+    }
+  };
+
   useEffect(() => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -794,12 +825,14 @@ export default function HomeScreen() {
   };
 
   const phoneDisplay = (() => {
-    if (!user?.phone) return 'Kurye';
+    if (!user?.phone) return '';
     const digits = user.phone.replace(/\D/g, '');
     const local = digits.startsWith('90') ? digits.slice(2) : digits;
     if (local.length !== 10) return user.phone;
     return `+90 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)} ${local.slice(8, 10)}`;
   })();
+
+  const displayName = user?.name || user?.email || 'Kurye';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg.base }} edges={["top"]}>
@@ -830,10 +863,10 @@ export default function HomeScreen() {
           </View>
           <View>
             <Text style={{ color: colors.text.faint, fontSize: 11, fontWeight: "600", letterSpacing: 0.5 }}>
-              HOŞ GELDİN
+              {phoneDisplay ? `HOŞ GELDİN — ${phoneDisplay}` : 'HOŞ GELDİN'}
             </Text>
             <Text style={{ color: colors.text.primary, fontSize: 16, fontWeight: "700", marginTop: 1 }}>
-              {phoneDisplay}
+              {displayName}
             </Text>
           </View>
         </View>
@@ -870,6 +903,22 @@ export default function HomeScreen() {
             }}>
               {isAvailable ? 'Müsaitim' : 'Müsait Değil'}
             </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setShowPasswordModal(true)}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: "rgba(255,255,255,0.04)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.07)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="key-outline" size={18} color="#a1a1aa" />
           </Pressable>
 
           <Pressable
@@ -1047,6 +1096,78 @@ export default function HomeScreen() {
           )}
         </ScrollView>
       )}
+      {/* Şifre Değiştirme Modalı */}
+      <Modal
+        visible={showPasswordModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPasswordModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "center", alignItems: "center", padding: 24 }}>
+          <View style={{ width: "100%", maxWidth: 320, backgroundColor: "#141414", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderRadius: 20, padding: 24, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(249,115,22,0.1)", borderWidth: 1, borderColor: "rgba(249,115,22,0.2)", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="key-outline" size={16} color="#f97316" style={{ marginTop: 9, marginLeft: 1 }} />
+              </View>
+              <View>
+                <Text style={{ color: "#ffffff", fontSize: 16, fontWeight: "700" }}>Şifre Değiştir</Text>
+                <Text style={{ color: "#71717a", fontSize: 11, marginTop: 1 }}>Yeni şifrenizi belirleyin.</Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 14, marginBottom: 24 }}>
+              <View>
+                <Text style={{ color: "#71717a", fontSize: 10, fontWeight: "700", marginBottom: 6, letterSpacing: 1, textTransform: "uppercase" }}>Yeni Şifre</Text>
+                <TextInput
+                  secureTextEntry
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="En az 6 karakter"
+                  placeholderTextColor="#3f3f46"
+                  style={{ width: "100%", height: 48, borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.02)", paddingHorizontal: 14, color: "#ffffff", fontSize: 14 }}
+                />
+              </View>
+
+              <View>
+                <Text style={{ color: "#71717a", fontSize: 10, fontWeight: "700", marginBottom: 6, letterSpacing: 1, textTransform: "uppercase" }}>Şifre Tekrar</Text>
+                <TextInput
+                  secureTextEntry
+                  value={newPasswordConfirm}
+                  onChangeText={setNewPasswordConfirm}
+                  placeholder="Şifreyi tekrar yazın"
+                  placeholderTextColor="#3f3f46"
+                  style={{ width: "100%", height: 48, borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.02)", paddingHorizontal: 14, color: "#ffffff", fontSize: 14 }}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable
+                onPress={() => {
+                  setShowPasswordModal(false);
+                  setNewPassword("");
+                  setNewPasswordConfirm("");
+                }}
+                disabled={passwordChangeLoading}
+                style={{ flex: 1, height: 44, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", alignItems: "center", justifyContent: "center" }}
+              >
+                <Text style={{ color: "#a1a1aa", fontSize: 14, fontWeight: "600" }}>İptal</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleChangePasswordSubmit}
+                disabled={passwordChangeLoading || !newPassword || !newPasswordConfirm}
+                style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: newPassword && newPasswordConfirm ? "#f97316" : "rgba(255,255,255,0.04)", alignItems: "center", justifyContent: "center" }}
+              >
+                {passwordChangeLoading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={{ color: newPassword && newPasswordConfirm ? "white" : "#3f3f46", fontSize: 14, fontWeight: "700" }}>Kaydet</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
