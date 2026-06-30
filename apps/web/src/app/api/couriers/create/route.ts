@@ -1,4 +1,3 @@
-import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
@@ -16,13 +15,34 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: Request) {
   try {
-    // 1. Authenticate caller (restaurant owner)
-    const supabase = createSupabaseServerClient();
+    // 1. Authenticate caller (restaurant owner) via Bearer Token
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Yetkisiz işlem. Giriş yapmalısınız (Token eksik)." },
+        { status: 401 }
+      );
+    }
+    const token = authHeader.split(" ")[1];
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
+
     const {
       data: { user },
+      error: getUserError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (getUserError || !user) {
       return NextResponse.json({ error: "Yetkisiz işlem. Giriş yapmalısınız." }, { status: 401 });
     }
 
@@ -58,7 +78,7 @@ export async function POST(req: Request) {
       Math.random().toString(36).slice(-8) + Math.floor(Math.random() * 10);
 
     // 4. Create auth user (silently with password)
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: cleanEmail,
       password: randomPassword,
       email_confirm: false, // verification link will be sent
@@ -68,14 +88,24 @@ export async function POST(req: Request) {
       },
     });
 
-    if (authError) {
-      return NextResponse.json({ error: `Auth Hatası: ${authError.message}` }, { status: 400 });
+    if (createError || !authUser?.user) {
+      return NextResponse.json(
+        { error: `Auth Hatası: ${createError?.message || "Kullanıcı oluşturulamadı."}` },
+        { status: 400 }
+      );
     }
 
-    // 5. Trigger Supabase verification email
+    // 5. Trigger Supabase verification email with dynamic redirect to our confirm page
+    const host = req.headers.get("host") || "localhost:3000";
+    const protocol = host.startsWith("localhost") ? "http" : "https";
+    const siteUrl = `${protocol}://${host}`;
+
     const { error: resendError } = await supabaseAdmin.auth.resend({
       type: "signup",
       email: cleanEmail,
+      options: {
+        emailRedirectTo: `${siteUrl}/auth/confirm`,
+      },
     });
 
     if (resendError) {

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   Bell, Store, Link2, User, Check, Clock,
   Utensils, Zap, ShoppingBag, Package, LucideIcon,
-  LogOut, Save,
+  LogOut, Save, Bot,
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
@@ -91,6 +91,7 @@ export default function SettingsPage() {
   const [maxMultiOrderKm, setMaxMultiOrderKm] = useState('3.0');
   const [maxMultiOrderCount, setMaxMultiOrderCount] = useState('3');
   const [avgPrepTime, setAvgPrepTime] = useState('20');
+  const [autoDispatch, setAutoDispatch] = useState(false);
   const [isSavingRestaurant, setIsSavingRestaurant] = useState(false);
 
   const [notifyNewOrder, setNotifyNewOrder] = useState(true);
@@ -122,7 +123,7 @@ export default function SettingsPage() {
       if (!user) return;
       const { data } = await supabase
         .from('restaurants')
-        .select('name, address, phone, integrations, avg_prep_time_minutes, max_multi_order_km, max_multi_order_count')
+        .select('name, address, phone, integrations, avg_prep_time_minutes, max_multi_order_km, max_multi_order_count, auto_dispatch_enabled')
         .eq('user_id', user.id)
         .maybeSingle();
       if (!data) return;
@@ -133,6 +134,7 @@ export default function SettingsPage() {
       if (data.avg_prep_time_minutes != null) setAvgPrepTime(String(data.avg_prep_time_minutes));
       if (data.max_multi_order_km != null) setMaxMultiOrderKm(String(data.max_multi_order_km));
       if (data.max_multi_order_count != null) setMaxMultiOrderCount(String(data.max_multi_order_count));
+      setAutoDispatch(data.auto_dispatch_enabled ?? false);
     }
     loadRestaurantFromDb();
   }, [user]);
@@ -152,6 +154,7 @@ export default function SettingsPage() {
           max_multi_order_km: parseFloat(maxMultiOrderKm) || 3.0,
           max_multi_order_count: parseInt(maxMultiOrderCount) || 3,
           avg_prep_time_minutes: prepTimeInt,
+          auto_dispatch_enabled: autoDispatch,
           lat: 0, lng: 0,
         };
         const { data: existing } = await supabase.from('restaurants').select('id').eq('user_id', user.id).maybeSingle();
@@ -292,6 +295,22 @@ export default function SettingsPage() {
                   <Field label="Maks. Paket Sayısı">
                     <Input type="number" step="1" min="1" max="10" value={maxMultiOrderCount} onChange={(e) => setMaxMultiOrderCount(e.target.value)} placeholder="3" />
                   </Field>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#1c1c1c] bg-[#111] overflow-hidden">
+                <div className="px-6 py-4 border-b border-[#1c1c1c] flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-[#f97316]" />
+                  <p className="text-sm font-semibold text-white">Otomatik Kurye Atama</p>
+                </div>
+                <div className="flex items-center justify-between px-6 py-5">
+                  <div>
+                    <p className="text-sm font-medium text-white">Otomatik Dispatch</p>
+                    <p className="text-xs text-[#52525b] mt-1 max-w-sm">
+                      Aktif olduğunda "Bekliyor" durumuna geçen siparişler, uygun en yakın kuryeye otomatik atanır.
+                    </p>
+                  </div>
+                  <Toggle checked={autoDispatch} onChange={setAutoDispatch} />
                 </div>
               </div>
 

@@ -269,25 +269,6 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            {__DEV__ && (
-              <View style={{
-                backgroundColor: "rgba(249,115,22,0.08)",
-                borderWidth: 1,
-                borderColor: "rgba(249,115,22,0.2)",
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-              }}>
-                <Ionicons name="construct-outline" size={16} color="#f97316" />
-                <Text style={{ color: "#f97316", fontSize: 12, fontWeight: "600", flex: 1 }}>
-                  Dev Modu: Test hesabı ile girmek için şifreye <Text style={{ fontWeight: "800" }}>000000</Text> yazın.
-                </Text>
-              </View>
-            )}
-
             {error && (
               <View style={{
                 backgroundColor: "rgba(239,68,68,0.08)",

@@ -21,6 +21,9 @@ import {
   Wallet,
   Split,
   Link2,
+  Navigation,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -44,7 +47,19 @@ const OrderMap = dynamic(
   }
 );
 
-type FilterTab = 'active' | OrderStatus | 'pending_payment';
+const LiveMapPanel = dynamic(
+  () => import('@/components/map/LiveMapPanel').then((m) => m.LiveMapPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[600px] items-center justify-center bg-[#0a0a0a]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#f97316] border-t-transparent" />
+      </div>
+    ),
+  }
+);
+
+type FilterTab = 'active' | OrderStatus | 'pending_payment' | 'map';
 
 const TABS: { value: FilterTab; label: string }[] = [
   { value: 'active',          label: 'Aktif' },
@@ -58,6 +73,7 @@ const TABS: { value: FilterTab; label: string }[] = [
 ];
 
 function filterOrders(orders: OrderWithCourier[], tab: FilterTab): OrderWithCourier[] {
+  if (tab === 'map') return [];
   if (tab === 'active')
     return orders.filter((o) => ['preparing', 'pending', 'assigned', 'picked_up'].includes(o.status));
   if (tab === 'pending_payment')
@@ -431,6 +447,7 @@ export function OrdersBoard() {
             />
             {isConnected ? 'Canlı' : 'Bağlanıyor…'}
           </div>
+
           <Button
             variant="outline"
             size="sm"
@@ -451,40 +468,80 @@ export function OrdersBoard() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <StatCard label="Hazırlanıyor" count={countForTab(orders, 'preparing')} valueColor="text-[#a855f7]" icon={<ChefHat className="h-5 w-5 text-[#a855f7]" />} />
-        <StatCard label="Bekliyor"      count={countForTab(orders, 'pending')}   valueColor="text-[#f59e0b]" icon={<Clock className="h-5 w-5 text-[#f59e0b]" />} />
-        <StatCard label="Atandı"        count={countForTab(orders, 'assigned')}  valueColor="text-[#60a5fa]" icon={<Bike className="h-5 w-5 text-[#60a5fa]" />} />
-        <StatCard label="Yolda"         count={countForTab(orders, 'picked_up')} valueColor="text-[#f97316]" icon={<Package className="h-5 w-5 text-[#f97316]" />} />
-        <StatCard label="Teslim Bugün"  count={countForTab(orders, 'delivered')} valueColor="text-[#22c55e]" icon={<CheckCircle2 className="h-5 w-5 text-[#22c55e]" />} />
-      </div>
-
-      {/* Tabs + grid */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FilterTab)}>
-        <div className="overflow-x-auto">
-          <TabsList className="mb-4 bg-[#141414] border border-[#2a2a2a]">
-            {TABS.map(({ value, label }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="data-[state=active]:bg-[#1e1e1e] data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-[#f97316] text-[#52525b] hover:text-[#a1a1aa]"
-              >
-                {label}
-                <span className="ml-1.5 rounded-full bg-[#1e1e1e] px-1.5 py-0.5 text-xs font-medium text-[#a1a1aa]">
-                  {countForTab(orders, value)}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+      {activeTab === 'map' ? (
+        <div className="space-y-4">
+          <Button 
+            onClick={() => setActiveTab('active')} 
+            variant="outline" 
+            className="border-[#2a2a2a] bg-[#141414] text-white hover:bg-[#1e1e1e]"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" /> Siparişlere Dön
+          </Button>
+          <div className="h-[600px] w-full relative">
+            <LiveMapPanel />
+          </div>
         </div>
+      ) : (
+        <>
+          {/* Canlı Harita Prominent Banner */}
+          <div 
+             onClick={() => setActiveTab('map')}
+             className="w-full bg-gradient-to-r from-[#f97316]/10 to-[#a855f7]/10 border border-[#f97316]/30 hover:border-[#f97316]/60 transition-all rounded-2xl p-5 flex items-center justify-between cursor-pointer group shadow-lg"
+          >
+             <div className="flex items-center gap-5">
+                <div className="p-3.5 bg-gradient-to-br from-[#f97316] to-[#ea6c0a] rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.4)] group-hover:scale-110 transition-transform">
+                   <Navigation className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                   <h3 className="text-white font-bold text-lg">Canlı Harita Görünümü</h3>
+                   <p className="text-[#a1a1aa] text-sm mt-0.5">Kuryelerin, müşterilerin ve bölgelerin anlık konumlarını haritada takip edin.</p>
+                </div>
+             </div>
+             <div className="text-[#f97316] font-semibold text-sm flex items-center gap-2 bg-[#f97316]/10 px-4 py-2 rounded-lg group-hover:bg-[#f97316]/20 transition-colors">
+                Haritayı Aç <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+             </div>
+          </div>
 
-        {TABS.map(({ value }) => (
-          <TabsContent key={value} value={value}>
-            {isLoading ? <LoadingSkeleton /> : <OrderGrid orders={filterOrders(sorted, value)} onSelect={setSelectedOrder} />}
-          </TabsContent>
-        ))}
-      </Tabs>
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatCard label="Hazırlanıyor" count={countForTab(orders, 'preparing')} valueColor="text-[#a855f7]" icon={<ChefHat className="h-5 w-5 text-[#a855f7]" />} />
+            <StatCard label="Bekliyor"      count={countForTab(orders, 'pending')}   valueColor="text-[#f59e0b]" icon={<Clock className="h-5 w-5 text-[#f59e0b]" />} />
+            <StatCard label="Atandı"        count={countForTab(orders, 'assigned')}  valueColor="text-[#60a5fa]" icon={<Bike className="h-5 w-5 text-[#60a5fa]" />} />
+            <StatCard label="Yolda"         count={countForTab(orders, 'picked_up')} valueColor="text-[#f97316]" icon={<Package className="h-5 w-5 text-[#f97316]" />} />
+            <StatCard label="Teslim Bugün"  count={countForTab(orders, 'delivered')} valueColor="text-[#22c55e]" icon={<CheckCircle2 className="h-5 w-5 text-[#22c55e]" />} />
+          </div>
+
+          {/* Tabs + grid */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FilterTab)}>
+            <div className="overflow-x-auto">
+              <TabsList className="mb-4 bg-[#141414] border border-[#2a2a2a]">
+                {TABS.map(({ value, label }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className="data-[state=active]:bg-[#1e1e1e] data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-[#f97316] text-[#52525b] hover:text-[#a1a1aa]"
+                  >
+                    {label}
+                    <span className="ml-1.5 rounded-full bg-[#1e1e1e] px-1.5 py-0.5 text-xs font-medium text-[#a1a1aa]">
+                      {countForTab(orders, value)}
+                    </span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+
+            {TABS.map(({ value }) => (
+              <TabsContent key={value} value={value}>
+                {isLoading ? (
+                  <LoadingSkeleton />
+                ) : (
+                  <OrderGrid orders={filterOrders(sorted, value)} onSelect={setSelectedOrder} />
+                )}
+              </TabsContent>
+            ))}
+          </Tabs>
+        </>
+      )}
 
       {currentModalOrder && (
         <OrderDetailModal

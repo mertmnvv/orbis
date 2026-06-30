@@ -4,6 +4,7 @@ import { Alert, Pressable, Text, View } from "react-native";
 import { useLocationTracking } from "../../hooks/useLocationTracking";
 import { useOrderStore } from "../../store/orderStore";
 import { useAuthStore } from "../../store/authStore";
+import { useTheme } from "../../hooks/useTheme";
 
 export default function AppLayout() {
   useLocationTracking();
@@ -11,10 +12,11 @@ export default function AppLayout() {
   const hasActive = activeOrders && activeOrders.length > 0;
   const isActive = useAuthStore((s) => s.isActive);
   const signOut = useAuthStore((s) => s.signOut);
+  const { colors } = useTheme();
 
   if (!isActive) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#080808", justifyContent: "center", alignItems: "center", paddingHorizontal: 32 }}>
+      <View style={{ flex: 1, backgroundColor: colors.bg.base, justifyContent: "center", alignItems: "center", paddingHorizontal: 32 }}>
         <View style={{
           width: 80,
           height: 80,
@@ -28,10 +30,10 @@ export default function AppLayout() {
         }}>
           <Ionicons name="lock-closed-outline" size={34} color="#ef4444" />
         </View>
-        <Text style={{ color: "#ffffff", fontSize: 19, fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
+        <Text style={{ color: colors.text.primary, fontSize: 19, fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
           Hesabınız Askıya Alındı
         </Text>
-        <Text style={{ color: "#71717a", fontSize: 13, textAlign: "center", lineHeight: 18, marginBottom: 32 }}>
+        <Text style={{ color: colors.text.secondary, fontSize: 13, textAlign: "center", lineHeight: 18, marginBottom: 32 }}>
           Yönetici tarafından hesabınız devre dışı bırakılmıştır. Lütfen restoran yönetimi veya destek ekibi ile iletişime geçiniz.
         </Text>
         <Pressable
@@ -58,7 +60,7 @@ export default function AppLayout() {
           }}
         >
           <Ionicons name="log-out-outline" size={17} color="#a1a1aa" />
-          <Text style={{ color: "#a1a1aa", fontSize: 13, fontWeight: "600" }}>
+          <Text style={{ color: colors.text.secondary, fontSize: 13, fontWeight: "600" }}>
             Çıkış Yap
           </Text>
         </Pressable>
@@ -71,13 +73,13 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: "#f97316",
-        tabBarInactiveTintColor: "#3f3f46",
+        tabBarInactiveTintColor: colors.text.faint,
         tabBarStyle: {
-          borderTopColor: "rgba(255,255,255,0.06)",
+          borderTopColor: colors.border.DEFAULT,
           borderTopWidth: 1,
           paddingTop: 6,
           height: 64,
-          backgroundColor: "#0d0d0d",
+          backgroundColor: colors.bg.surface,
         },
         tabBarLabelStyle: {
           fontSize: 10,
@@ -128,7 +130,7 @@ export default function AppLayout() {
                     borderRadius: 4,
                     backgroundColor: "#f97316",
                     borderWidth: 1.5,
-                    borderColor: "#0d0d0d",
+                    borderColor: colors.bg.surface,
                   }}
                 />
               )}

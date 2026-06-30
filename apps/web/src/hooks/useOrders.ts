@@ -60,6 +60,27 @@ export function useOrders(filter?: OrdersFilter) {
   });
 }
 
+async function triggerAutoDispatch(orderId: string): Promise<void> {
+  try {
+    await fetch('/api/orders/auto-assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId }),
+    });
+  } catch {
+    // Fire-and-forget — hata sessizce görmezden gelinir
+  }
+}
+
+async function isAutoDispatchEnabled(): Promise<boolean> {
+  const { data } = await supabase
+    .from('restaurants')
+    .select('auto_dispatch_enabled')
+    .limit(1)
+    .maybeSingle();
+  return data?.auto_dispatch_enabled ?? false;
+}
+
 export function useRealtimeOrders() {
   const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
@@ -74,13 +95,20 @@ export function useRealtimeOrders() {
         (payload) => {
           queryClient.invalidateQueries({ queryKey: ['orders'], exact: false });
           if (payload.eventType === 'INSERT') {
-            const platform = String((payload.new as Record<string, unknown>).platform ?? '');
+            const row = payload.new as Record<string, unknown>;
+            const platform = String(row.platform ?? '');
             playAlert();
             toast.success('Yeni sipariş!', { description: `Platform: ${platform}` });
           } else if (payload.eventType === 'UPDATE') {
             const row = payload.new as Record<string, unknown>;
             const name = String(row.customer_name ?? '');
             const status = String(row.status ?? '') as OrderStatus;
+            // "pending" durumuna geçişte auto-dispatch dene
+            if (status === 'pending' && !row.courier_id) {
+              isAutoDispatchEnabled().then((enabled) => {
+                if (enabled) triggerAutoDispatch(String(row.id));
+              });
+            }
             toast.info('Sipariş güncellendi', {
               description: `${name} → ${STATUS_LABELS[status] ?? status}`,
             });

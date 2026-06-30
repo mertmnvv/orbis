@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ClipboardList, LogOut, Settings, Users, Map, BarChart3, UtensilsCrossed, TrendingUp } from 'lucide-react';
+import { ClipboardList, Users, Map, BarChart3, UtensilsCrossed, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/providers/AuthProvider';
+import { useLayoutContext } from '@/providers/LayoutProvider';
 
 const NAV_ITEMS = [
   { href: '/dashboard',  label: 'Özet & Raporlar', icon: BarChart3,       matchPaths: ['/dashboard'] },
@@ -13,27 +13,21 @@ const NAV_ITEMS = [
   { href: '/menu',       label: 'Menü',            icon: UtensilsCrossed, matchPaths: ['/menu'] },
   { href: '/analytics',  label: 'Analitik',        icon: TrendingUp,      matchPaths: ['/analytics'] },
   { href: '/zones',      label: 'Bölgeler',        icon: Map,             matchPaths: ['/zones'] },
-  { href: '/settings',   label: 'Ayarlar',         icon: Settings,        matchPaths: ['/settings'] },
 ] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { isSidebarOpen } = useLayoutContext();
 
   return (
-    <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-[#2a2a2a] bg-[#141414]">
-      {/* Logo */}
-      <div className="flex items-center gap-3 border-b border-[#2a2a2a] px-5 py-[18px]">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl overflow-hidden shadow-lg shadow-orange-900/30">
-          <img src="/logo-icon.png" alt="Orbis" className="h-8 w-8 object-cover" />
-        </div>
-        <span className="text-base font-bold tracking-tight text-white">
-          Orbis
-        </span>
-      </div>
-
+    <aside
+      className={cn(
+        "flex h-full flex-col border-r border-[#2a2a2a] bg-[#141414] transition-all duration-300 overflow-hidden",
+        isSidebarOpen ? "w-60" : "w-0 border-r-0"
+      )}
+    >
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 p-3">
+      <nav className="flex-1 space-y-0.5 p-3 min-w-[240px]">
         {NAV_ITEMS.map(({ href, label, icon: Icon, matchPaths }) => {
           const isActive = matchPaths.some((p) => pathname === p || ((p as string) !== '/orders/new' && pathname.startsWith(p)));
           return (
@@ -58,20 +52,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      {/* User info + logout */}
-      <div className="border-t border-[#2a2a2a] p-4">
-        <p className="truncate text-xs font-semibold text-[#a1a1aa]">
-          {user?.email ?? 'Restoran'}
-        </p>
-        <button
-          onClick={signOut}
-          className="mt-2 flex items-center gap-1.5 text-xs text-[#52525b] hover:text-[#ef4444] transition-colors"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-          Çıkış Yap
-        </button>
-      </div>
     </aside>
   );
 }

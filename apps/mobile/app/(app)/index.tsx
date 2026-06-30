@@ -918,33 +918,9 @@ export default function HomeScreen() {
               justifyContent: "center",
             }}
           >
-            <Ionicons name="key-outline" size={18} color="#a1a1aa" />
+            <Ionicons name="settings-outline" size={18} color="#a1a1aa" />
           </Pressable>
 
-          <Pressable
-            onPress={() => {
-              Alert.alert(
-                'Çıkış Yap',
-                'Çıkış yapmak istediğinize emin misiniz?',
-                [
-                  { text: 'İptal', style: 'cancel' },
-                  { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
-                ],
-              );
-            }}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: "rgba(255,255,255,0.04)",
-              borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.07)",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="log-out-outline" size={19} color="#3f3f46" />
-          </Pressable>
         </View>
       </View>
 
@@ -1107,11 +1083,11 @@ export default function HomeScreen() {
           <View style={{ width: "100%", maxWidth: 320, backgroundColor: "#141414", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderRadius: 20, padding: 24, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 10 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 20 }}>
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(249,115,22,0.1)", borderWidth: 1, borderColor: "rgba(249,115,22,0.2)", alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="key-outline" size={16} color="#f97316" style={{ marginTop: 9, marginLeft: 1 }} />
+                <Ionicons name="settings-outline" size={16} color="#f97316" />
               </View>
               <View>
-                <Text style={{ color: "#ffffff", fontSize: 16, fontWeight: "700" }}>Şifre Değiştir</Text>
-                <Text style={{ color: "#71717a", fontSize: 11, marginTop: 1 }}>Yeni şifrenizi belirleyin.</Text>
+                <Text style={{ color: "#ffffff", fontSize: 16, fontWeight: "700" }}>Hesap Ayarları</Text>
+                <Text style={{ color: "#71717a", fontSize: 11, marginTop: 1 }}>Şifre değiştir veya çıkış yap.</Text>
               </View>
             </View>
 
@@ -1163,6 +1139,27 @@ export default function HomeScreen() {
                 ) : (
                   <Text style={{ color: newPassword && newPasswordConfirm ? "white" : "#3f3f46", fontSize: 14, fontWeight: "700" }}>Kaydet</Text>
                 )}
+              </Pressable>
+            </View>
+
+            {/* Çıkış Yap */}
+            <View style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", marginTop: 4, paddingTop: 14 }}>
+              <Pressable
+                onPress={() => {
+                  setShowPasswordModal(false);
+                  Alert.alert(
+                    'Çıkış Yap',
+                    'Çıkış yapmak istediğinize emin misiniz?',
+                    [
+                      { text: 'İptal', style: 'cancel' },
+                      { text: 'Çıkış Yap', style: 'destructive', onPress: signOut },
+                    ],
+                  );
+                }}
+                style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 44, borderRadius: 12, backgroundColor: "rgba(239,68,68,0.08)", borderWidth: 1, borderColor: "rgba(239,68,68,0.18)" }}
+              >
+                <Ionicons name="log-out-outline" size={17} color="#ef4444" />
+                <Text style={{ color: "#ef4444", fontSize: 14, fontWeight: "700" }}>Çıkış Yap</Text>
               </Pressable>
             </View>
           </View>

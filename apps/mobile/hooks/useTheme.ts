@@ -18,7 +18,6 @@ const dark = {
   },
 };
 
-
 export type AppTheme = typeof dark;
 
 export function useTheme(): { colors: AppTheme; isDark: boolean } {

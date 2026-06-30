@@ -1,18 +1,6 @@
 'use client';
 
-/**
- * useCourierRealtime
- *
- * Supabase Realtime üzerinden tüm aktif kuryelerin konumlarını dinler.
- * couriers tablosuna UPDATE geldiğinde state'i günceller; web paneli
- * harita üzerindeki işaretçileri sayfa yenilemeden hareket ettirir.
- *
- * Mock modu: NEXT_PUBLIC_SUPABASE_URL tanımlı değilse 5 sn'de bir
- *            rastgele küçük konum delta'sı simüle eder.
- */
-
 import { useEffect, useRef, useState } from 'react';
-import { mockCouriers } from '@/lib/mock-data';
 import { supabase } from '@/lib/supabase';
 import type { Courier } from '@/lib/types';
 
@@ -33,16 +21,11 @@ interface UseCourierRealtimeReturn {
   isConnected: boolean;
 }
 
-const IS_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
-
 export function useCourierRealtime(): UseCourierRealtimeReturn {
   const [couriers, setCouriers] = useState<Map<string, CourierPosition>>(new Map());
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (IS_MOCK) {
-      return setupMock(setCouriers, setIsConnected);
-    }
     return setupRealtime(setCouriers, setIsConnected);
   }, []);
 
@@ -102,47 +85,6 @@ function setupRealtime(
 
   return () => {
     supabase.removeChannel(channel);
-  };
-}
-
-// ─── Mock (Development) ──────────────────────────────────────────────────────
-
-function setupMock(
-  setCouriers: React.Dispatch<React.SetStateAction<Map<string, CourierPosition>>>,
-  setIsConnected: React.Dispatch<React.SetStateAction<boolean>>,
-): () => void {
-  // Başlangıç konumları
-  const initialMap = buildMap(
-    mockCouriers.filter((c) => c.current_lat !== null) as Courier[],
-  );
-  setCouriers(initialMap);
-
-  // Bağlantı simülasyonu
-  const connectTimer = setTimeout(() => setIsConnected(true), 800);
-
-  // 5 sn'de bir küçük delta uygula (animasyon testi için)
-  const interval = setInterval(() => {
-    setCouriers((prev) => {
-      const next = new Map(prev);
-      next.forEach((pos, id) => {
-        const deltaLat = (Math.random() - 0.5) * 0.001;
-        const deltaLng = (Math.random() - 0.5) * 0.001;
-        next.set(id, {
-          ...pos,
-          prevLat: pos.lat,
-          prevLng: pos.lng,
-          lat: pos.lat + deltaLat,
-          lng: pos.lng + deltaLng,
-          lastSeenAt: new Date().toISOString(),
-        });
-      });
-      return next;
-    });
-  }, 5_000);
-
-  return () => {
-    clearTimeout(connectTimer);
-    clearInterval(interval);
   };
 }
 

@@ -30,45 +30,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signIn: async (email, password) => {
     set({ isLoading: true });
-    
-    // Geliştirme bypass: "devtest@orbiscourier.com" ve "000000" ile bypass giriş
-    const useRealOtp = process.env.EXPO_PUBLIC_USE_REAL_OTP === "true";
-    if (__DEV__ && password === "000000" && !useRealOtp) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: "devtest@orbiscourier.com",
-        password: "OrbisTest2024!",
-      });
-      if (error) {
-        set({ isLoading: false });
-        return { error };
-      }
-      
-      const { data: courier, error: courierErr } = await supabase
-        .from("couriers")
-        .select("name, phone, email, is_available, is_active, restaurant_id")
-        .eq("user_id", data.user!.id)
-        .maybeSingle();
-
-      if (courierErr || !courier) {
-        await supabase.auth.signOut();
-        set({ isLoading: false });
-        return { error: new Error("Kurye kaydı bulunamadı.") };
-      }
-
-      set({
-        user: {
-          id: data.user!.id,
-          email: data.user!.email ?? "",
-          phone: courier.phone ?? "",
-          name: courier.name ?? "",
-        },
-        isAvailable: courier.is_available ?? true,
-        isActive: courier.is_active ?? true,
-        restaurantId: courier.restaurant_id ?? null,
-        isLoading: false,
-      });
-      return { error: null };
-    }
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),

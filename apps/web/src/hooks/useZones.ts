@@ -37,9 +37,19 @@ export function useCreateZone() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { name: string; polygon: GeoJSON.Feature<GeoJSON.Polygon>; color: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Oturum açık değil.');
+
+      const { data: restaurant, error: resErr } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (resErr || !restaurant) throw new Error('Restoran kaydı bulunamadı.');
+
       const { data, error } = await supabase
         .from('delivery_zones')
-        .insert({ name: payload.name, polygon: payload.polygon, color: payload.color, is_active: true })
+        .insert({ name: payload.name, polygon: payload.polygon, color: payload.color, is_active: true, restaurant_id: restaurant.id })
         .select()
         .single();
       if (error) throw error;

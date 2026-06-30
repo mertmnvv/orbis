@@ -249,11 +249,16 @@ export function CouriersPanel() {
     }
 
     try {
+      // Get auth token from client supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       // Call secure next API route to create courier account
       const res = await fetch('/api/couriers/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || ''}`,
         },
         body: JSON.stringify({
           email: claimEmail.trim(),

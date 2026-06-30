@@ -150,11 +150,15 @@ export function ZoneMap({ zones, isDrawing, onDrawingEnd, selectedId }: ZoneMapP
 
   const handleSaveZone = async () => {
     if (!pendingPolygon || !zoneName.trim()) return;
-    await createMutation.mutateAsync({ name: zoneName.trim(), polygon: pendingPolygon, color: zoneColor });
-    setShowNameDialog(false);
-    setPendingPolygon(null);
-    setZoneName('');
-    onDrawingEnd();
+    try {
+      await createMutation.mutateAsync({ name: zoneName.trim(), polygon: pendingPolygon, color: zoneColor });
+      setShowNameDialog(false);
+      setPendingPolygon(null);
+      setZoneName('');
+      onDrawingEnd();
+    } catch (err: any) {
+      alert(err?.message ?? 'Bölge kaydedilemedi.');
+    }
   };
 
   const handleCancelDraw = () => {

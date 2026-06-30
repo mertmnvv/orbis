@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useOrderStore } from "../../store/orderStore";
+import type { Order } from "../../types";
 
 const isExpoGo = Constants.appOwnership === "expo";
 let MapboxGL: typeof import("@rnmapbox/maps").default | null = null;
@@ -27,6 +28,45 @@ const ORDER_COLORS = ["#f97316", "#3b82f6", "#10b981", "#a855f7", "#ef4444"];
 
 // Height reserved for the bottom card so the camera doesn't hide pins under it.
 const BOTTOM_CARD_H = 300;
+
+// ─── Nearest-neighbour route optimisation ────────────────────────────────────
+// Returns orders sorted so the total delivery distance is minimised.
+// Each order's "stop" is its customer location (or restaurant if not yet picked up).
+function optimiseRoute(orders: Order[], courierLat?: number, courierLng?: number): Order[] {
+  if (orders.length <= 1) return orders;
+
+  function dist(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const dx = lat2 - lat1;
+    const dy = (lng2 - lng1) * Math.cos((lat1 * Math.PI) / 180);
+    return dx * dx + dy * dy; // squared Euclidean — sufficient for ordering
+  }
+
+  const remaining = [...orders];
+  const result: Order[] = [];
+  let curLat = courierLat ?? orders[0].restaurantLat;
+  let curLng = courierLng ?? orders[0].restaurantLng;
+
+  while (remaining.length > 0) {
+    let nearestIdx = 0;
+    let nearestDist = Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const o = remaining[i];
+      const stopLat = o.status === "picked_up" ? o.customerLat : o.restaurantLat;
+      const stopLng = o.status === "picked_up" ? o.customerLng : o.restaurantLng;
+      const d = dist(curLat, curLng, stopLat, stopLng);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestIdx = i;
+      }
+    }
+    const chosen = remaining.splice(nearestIdx, 1)[0];
+    result.push(chosen);
+    curLat = chosen.status === "picked_up" ? chosen.customerLat : chosen.restaurantLat;
+    curLng = chosen.status === "picked_up" ? chosen.customerLng : chosen.restaurantLng;
+  }
+
+  return result;
+}
 
 function EmptyState() {
   return (
@@ -83,7 +123,9 @@ export default function MapScreen() {
     return <EmptyState />;
   }
 
-  const coloredOrders = activeOrders.map((o, i) => ({
+  // Sort orders by nearest-neighbour for optimal delivery sequence
+  const sortedOrders = optimiseRoute(activeOrders);
+  const coloredOrders = sortedOrders.map((o, i) => ({
     ...o,
     color: ORDER_COLORS[i % ORDER_COLORS.length],
   }));

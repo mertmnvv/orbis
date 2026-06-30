@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { MenuItem } from '@/lib/types';
-import { MOCK_MENU_ITEMS } from '@/lib/mock-data';
 
 export function useMenuItems(restaurantId: string | null) {
   return useQuery<MenuItem[]>({
@@ -15,9 +14,7 @@ export function useMenuItems(restaurantId: string | null) {
         .order('category')
         .order('name');
       if (error) throw error;
-      const items = data ?? [];
-      if (items.length > 0) return items;
-      return MOCK_MENU_ITEMS.map((i) => ({ ...i, restaurant_id: restaurantId }));
+      return data ?? [];
     },
     enabled: !!restaurantId,
     staleTime: 30_000,
